@@ -1,0 +1,31 @@
+# Bicep / Azure
+*.bicepparam.local
+*.local.bicepparam
+*.parameters.local.json
+.azure/
+
+# Compiled ARM (optional local builds)
+**/bin/
+**/obj/
+*.json.bak
+
+# Secrets and local env
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Logs
+*.log
+
+# Compiled ARM from az bicep build
+**/main.json
+**/acr-pull.json
