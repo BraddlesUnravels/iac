@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/braddlesunravels/iac/main/schemas/workload.schema.json",
+  "title": "Application workload deployment intent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "application",
+    "stack",
+    "environment",
+    "container",
+    "env",
+    "secretRefs",
+    "customDomain"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "application": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "stack": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "environment": {
+      "enum": ["dev", "test", "stage", "production"]
+    },
+    "container": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "targetPort",
+        "healthProbePath",
+        "cpu",
+        "memory",
+        "minReplicas",
+        "maxReplicas"
+      ],
+      "properties": {
+        "targetPort": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "healthProbePath": {
+          "type": "string",
+          "pattern": "^/[^?#]*$"
+        },
+        "cpu": {
+          "type": "string",
+          "pattern": "^(?:0\\.(?:25|5|75)|[1-9][0-9]*(?:\\.(?:0|25|5|75))?)$"
+        },
+        "memory": {
+          "type": "string",
+          "pattern": "^(?:0\\.5|[1-9][0-9]*(?:\\.0)?)Gi$"
+        },
+        "minReplicas": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxReplicas": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "env": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Z][A-Z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "secretRefs": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Z][A-Z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 127,
+        "pattern": "^[0-9a-zA-Z-]+$"
+      }
+    },
+    "customDomain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

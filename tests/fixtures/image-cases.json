@@ -1,0 +1,10 @@
+{
+  "callerSha": "0123456789abcdef0123456789abcdef01234567",
+  "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "validTag": "acriacvalidation001.azurecr.io/access-control-demo:0123456789abcdef0123456789abcdef01234567",
+  "mutableTag": "acriacvalidation001.azurecr.io/access-control-demo:latest",
+  "wrongRegistryTag": "otherregistry.azurecr.io/access-control-demo:0123456789abcdef0123456789abcdef01234567",
+  "wrongRepositoryTag": "acriacvalidation001.azurecr.io/other-app:0123456789abcdef0123456789abcdef01234567",
+  "differentSha": "fedcba9876543210fedcba9876543210fedcba98",
+  "differentDigest": "sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+}

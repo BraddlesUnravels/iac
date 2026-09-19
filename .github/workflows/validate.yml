@@ -1,0 +1,192 @@
+name: Validate infrastructure
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  schema-tests:
+    name: 01 / Schema tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run environment schema tests
+        run: node --test tests/environment-validator.test.mjs
+
+  contract-tests:
+    name: 02 / Contract and image tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run workload and image tests
+        run: >-
+          node --test
+          tests/contract-validator.test.mjs
+          tests/image-validator.test.mjs
+
+  bicep-build:
+    name: 03 / Bicep build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Install pinned Bicep CLI
+        run: az bicep install --version v0.47.16
+
+      - name: Build Bicep entry points without warnings
+        run: node scripts/validate-bicep.mjs
+
+  shell-validation:
+    name: 04 / Shell validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
+        with:
+          scandir: ./scripts
+          version: v0.11.0
+
+      - name: Check Bash syntax
+        run: bash -n scripts/*.sh
+
+  security-scan:
+    name: 05 / Security scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13'
+
+      - name: Install pinned Bicep CLI
+        run: az bicep install --version v0.47.16
+
+      - name: Compile all Bicep for security scanning
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          output_directory="${RUNNER_TEMP}/compiled-arm"
+          mkdir -p "${output_directory}"
+
+          while IFS= read -r source_file; do
+            output_name="${source_file//\//__}"
+            az bicep build \
+              --file "${source_file}" \
+              --outfile "${output_directory}/${output_name%.bicep}.json"
+          done < <(find . -type f -name '*.bicep' -not -path './node_modules/*' | sort)
+
+      - name: Install pinned Checkov
+        run: python -m pip install --disable-pip-version-check checkov==3.3.19
+
+      - name: Run Checkov against compiled ARM
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # CKV_AZURE_139, 163, 166, and 233 require networking or scanning
+          # features outside the approved Basic ACR design. CKV_AZURE_41, 42,
+          # 109, 110, and 189 cover the legacy Key Vault module that Phase 3
+          # removes from the platform and hardens before production adoption.
+          checkov \
+            --directory "${RUNNER_TEMP}/compiled-arm" \
+            --framework arm \
+            --output cli \
+            --skip-check \
+              CKV_AZURE_41,CKV_AZURE_42,CKV_AZURE_109,CKV_AZURE_110,CKV_AZURE_139,CKV_AZURE_163,CKV_AZURE_166,CKV_AZURE_189,CKV_AZURE_233
+
+  examples:
+    name: 06 / Validation examples
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Validate fixture environment
+        run: npm run validate:environment
+
+      - name: Validate fixture workload contract
+        run: npm run validate:examples
+
+  validation-summary:
+    name: 07 / Validation summary
+    if: ${{ always() }}
+    needs:
+      - schema-tests
+      - contract-tests
+      - bicep-build
+      - shell-validation
+      - security-scan
+      - examples
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Publish results
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo '## Infrastructure validation'
+            echo
+            jq -r 'to_entries[] | "- `\(.key)`: \(.value.result)"' <<<"${RESULTS}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          jq --exit-status \
+            'all(.[]; .result == "success")' \
+            <<<"${RESULTS}" \
+            >/dev/null

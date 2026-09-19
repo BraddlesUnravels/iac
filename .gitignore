@@ -16,6 +16,9 @@
 *.pem
 *.key
 
+# Node validation tooling
+node_modules/
+
 # OS / editor
 .DS_Store
 .idea/
