@@ -1,0 +1,20 @@
+{
+  "name": "azure-iac-validation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "validate:environment": "node scripts/validate-environment.mjs tests/fixtures/environment.valid.json",
+    "validate:examples": "node scripts/validate-contract.mjs tests/fixtures/workload.valid.json tests/fixtures/environment.valid.json --caller-repository braddlesunravels/access-control-demo",
+    "validate:bicep": "node scripts/validate-bicep.mjs",
+    "validate": "npm test && npm run validate:environment && npm run validate:examples && npm run validate:bicep"
+  },
+  "devDependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
+  }
+}
