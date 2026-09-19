@@ -20,17 +20,12 @@ var normalizedEnvironment = toLower(environment)
 var normalizedSuffix = empty(suffix) ? '' : '-${toLower(suffix)}'
 var base = '${normalizedPrefix}-${normalizedEnvironment}${normalizedSuffix}'
 
-// ACR: 5-50 alphanumeric only
-var acrBase = replace(replace(base, '-', ''), '_', '')
 
 @description('Resource group friendly name suggestion.')
 output resourceGroupName string = 'rg-${base}'
 
 @description('Log Analytics workspace name.')
 output logAnalyticsName string = 'log-${base}'
-
-@description('Azure Container Registry name (alphanumeric).')
-output containerRegistryName string = take('acr${acrBase}', 50)
 
 @description('Container Apps environment name.')
 output containerAppsEnvironmentName string = 'acae-${base}'

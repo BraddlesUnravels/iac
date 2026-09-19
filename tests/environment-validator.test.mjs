@@ -34,3 +34,26 @@ test('rejects inverted environment bounds', async () => {
   assert.equal(result.valid, false);
   assert.match(result.errors.join('\n'), /minimum must not exceed/);
 });
+
+test('accepts a workload without secrets or a custom domain', async () => {
+  const result = await validateEnvironment(
+    await readFixture('environment.no-capabilities.json'),
+  );
+
+  assert.equal(result.valid, true, result.errors.join('\n'));
+});
+
+const invalidCapabilityFixtures = [
+  ['environment.domain-without-certificate.json', /must both be set or both be null/],
+  ['environment.certificate-without-domain.json', /must both be set or both be null/],
+  ['environment.secrets-without-key-vault.json', /keyVaultName is required/],
+];
+
+for (const [fixture, messagePattern] of invalidCapabilityFixtures) {
+  test(`rejects ${fixture}`, async () => {
+    const result = await validateEnvironment(await readFixture(fixture));
+
+    assert.equal(result.valid, false);
+    assert.match(result.errors.join('\n'), messagePattern);
+  });
+}

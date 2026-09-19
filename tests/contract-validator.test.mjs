@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import { validateContract } from '../scripts/validate-contract.mjs';
+import {
+  parseOptions,
+  validateContract,
+} from '../scripts/validate-contract.mjs';
 
 const readFixture = async (name) =>
   JSON.parse(
@@ -77,3 +80,69 @@ test('rejects immutable caller ID mismatches', async () => {
   assert.match(result.errors.join('\n'), /Caller repository ID must equal/);
   assert.match(result.errors.join('\n'), /Caller repository owner ID must equal/);
 });
+
+const missingCallerCases = [
+  ['repository name', { ...caller, callerRepository: undefined }, /Caller repository is required/],
+  ['repository ID', { ...caller, callerRepositoryId: undefined }, /Caller repository ID is required/],
+  ['repository owner ID', { ...caller, callerRepositoryOwnerId: undefined }, /Caller repository owner ID is required/],
+];
+
+for (const [field, callerEvidence, messagePattern] of missingCallerCases) {
+  test(`rejects missing caller ${field}`, async () => {
+    const result = await validateContract(
+      await readFixture('workload.valid.json'),
+      catalog,
+      callerEvidence,
+    );
+
+    assert.equal(result.valid, false);
+    assert.match(result.errors.join('\n'), messagePattern);
+  });
+}
+
+test('reports every missing caller identity field', async () => {
+  const result = await validateContract(
+    await readFixture('workload.valid.json'),
+    catalog,
+  );
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /Caller repository is required/);
+  assert.match(result.errors.join('\n'), /Caller repository ID is required/);
+  assert.match(result.errors.join('\n'), /Caller repository owner ID is required/);
+});
+
+test('parses the exact caller identity option set', () => {
+  assert.deepEqual(
+    parseOptions([
+      '--caller-repository',
+      caller.callerRepository,
+      '--caller-repository-id',
+      caller.callerRepositoryId,
+      '--caller-repository-owner-id',
+      caller.callerRepositoryOwnerId,
+    ]),
+    {
+      'caller-repository': caller.callerRepository,
+      'caller-repository-id': caller.callerRepositoryId,
+      'caller-repository-owner-id': caller.callerRepositoryOwnerId,
+    },
+  );
+});
+
+const invalidOptionCases = [
+  ['unknown option', ['--target-subscription', 'forbidden'], /Unknown option/],
+  [
+    'duplicate option',
+    ['--caller-repository', caller.callerRepository, '--caller-repository', caller.callerRepository],
+    /Duplicate option/,
+  ],
+  ['option without a value', ['--caller-repository'], /must have a non-empty value/],
+  ['empty option value', ['--caller-repository', ''], /requires a non-empty value/],
+];
+
+for (const [name, args, messagePattern] of invalidOptionCases) {
+  test(`rejects ${name}`, () => {
+    assert.throws(() => parseOptions(args), messagePattern);
+  });
+}

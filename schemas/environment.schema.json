@@ -227,7 +227,14 @@
           "$ref": "#/$defs/azureResourceName"
         },
         "keyVaultName": {
-          "$ref": "#/$defs/keyVaultName"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/keyVaultName"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "runtimeIdentityName": {
           "$ref": "#/$defs/identityName"
@@ -242,16 +249,29 @@
           "$ref": "#/$defs/identityName"
         },
         "customDomainName": {
-          "type": "string",
-          "format": "hostname"
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "hostname"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "certificateResourceId": {
-          "type": "string",
-          "pattern": "^/subscriptions/[0-9a-fA-F-]{36}/resourceGroups/[^/]+/providers/Microsoft\\.App/managedEnvironments/[^/]+/(?:managedCertificates|certificates)/[^/]+$"
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^/subscriptions/[0-9a-fA-F-]{36}/resourceGroups/[^/]+/providers/Microsoft\\.App/managedEnvironments/[^/]+/(?:managedCertificates|certificates)/[^/]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "allowedSecretNames": {
           "type": "array",
-          "minItems": 1,
           "uniqueItems": true,
           "items": {
             "$ref": "#/$defs/secretName"

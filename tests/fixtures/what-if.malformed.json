@@ -1,0 +1,16 @@
+{
+  "status": "Succeeded",
+  "properties": {
+*** Add File: /Users/radaskey/code/iac/tests/fixtures/what-if.incomplete.json
+{
+  "status": "Failed",
+  "properties": {
+    "changes": [],
+    "diagnostics": [
+      {
+        "level": "Error",
+        "message": "The result could not be fully expanded."
+      }
+    ]
+  }
+}

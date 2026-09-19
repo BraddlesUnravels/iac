@@ -1,0 +1,45 @@
+{
+  "$schema": "../../schemas/environment.schema.json",
+  "schemaVersion": 1,
+  "name": "production",
+  "azure": {
+    "subscriptionId": "eb1b0038-3a72-459d-884c-ba2820dc53cc",
+    "tenantId": "f1c96730-73a1-4159-81ab-0bb6731c8e75",
+    "location": "australiaeast",
+    "platformResourceGroup": "rg-platform-production",
+    "containerRegistryName": "acriacvalidation001",
+    "containerRegistryLoginServer": "acriacvalidation001.azurecr.io",
+    "containerRegistryRoleAssignmentMode": "AbacRepositoryPermissions"
+  },
+  "workloads": {
+    "static-site": {
+      "resourceGroup": "rg-static-site",
+      "stack": "static-site",
+      "repository": "braddlesunravels/static-site",
+      "repositoryId": "1000000001",
+      "repositoryOwnerId": "103235805",
+      "containerRepository": "static-site",
+      "containerAppsEnvironmentName": "aca-static-site",
+      "containerAppName": "aca-static-site",
+      "logAnalyticsWorkspaceName": "log-static-site",
+      "keyVaultName": null,
+      "runtimeIdentityName": "id-static-site-runtime",
+      "publisherIdentityName": "id-static-site-publisher",
+      "plannerIdentityName": "id-static-site-planner",
+      "deployerIdentityName": "id-static-site-deployer",
+      "customDomainName": null,
+      "certificateResourceId": null,
+      "allowedSecretNames": [],
+      "migrationSecretNames": [],
+      "externalEnvironmentVariables": [],
+      "bounds": {
+        "targetPorts": [3000],
+        "minReplicas": { "minimum": 0, "maximum": 1 },
+        "maxReplicas": { "minimum": 1, "maximum": 2 },
+        "healthProbePaths": ["/health"],
+        "cpu": ["0.25"],
+        "memory": ["0.5Gi"]
+      }
+    }
+  }
+}

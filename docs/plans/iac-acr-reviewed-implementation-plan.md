@@ -445,7 +445,7 @@ Azure subscription and tenant IDs, managed identity client IDs, resource IDs, Su
   deploy-workload.yml
   teardown-workload.yml
 
-agent-tmp-plans/
+docs/plans/
   iac-acr-reviewed-implementation-plan.md
 
 docs/
@@ -604,7 +604,7 @@ The contract must not contain Azure coordinates, Key Vault URLs, certificate IDs
 
 ### 10.1 ACR module
 
-Use stable API `Microsoft.ContainerRegistry/registries@2025-04-01`.
+Use stable API `Microsoft.ContainerRegistry/registries@2025-11-01`.
 
 ```bicep
 @description('Globally unique ACR name.')
@@ -616,7 +616,7 @@ param location string
 @description('Resource tags.')
 param tags object = {}
 
-resource registry 'Microsoft.ContainerRegistry/registries@2025-04-01' = {
+resource registry 'Microsoft.ContainerRegistry/registries@2025-11-01' = {
   name: name
   location: location
   tags: tags
@@ -1075,7 +1075,7 @@ Gate:
 - current production values can be represented without secrets;
 - no Azure login occurs in validation.
 
-### Phase 2: shared ACR
+### Phase 2: fail-closed corrections and shared ACR
 
 Update:
 

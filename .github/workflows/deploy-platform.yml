@@ -1,0 +1,290 @@
+name: Deploy shared Azure platform
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Approved platform environment
+        required: true
+        type: choice
+        options:
+          - production
+      operation:
+        description: Preview or apply the platform deployment
+        required: true
+        type: choice
+        options:
+          - what-if
+          - apply
+      confirmation:
+        description: For apply, enter deploy rg-platform-production/braddlesunravelsacr
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-production
+  cancel-in-progress: false
+
+jobs:
+  static-validation:
+    name: 01 / Static validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install pinned Bicep CLI
+        run: az bicep install --version v0.47.16
+
+      - name: Run Node and Bicep validation
+        run: npm run validate
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
+        with:
+          scandir: ./scripts
+          version: v0.11.0
+
+      - name: Check Bash syntax
+        run: bash -n scripts/*.sh
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13'
+
+      - name: Install pinned Checkov
+        run: python -m pip install --disable-pip-version-check checkov==3.3.19
+
+      - name: Compile and scan platform template
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          compiled_template="${RUNNER_TEMP}/platform.json"
+          az bicep build \
+            --file platform/main.bicep \
+            --outfile "${compiled_template}"
+
+          # Basic ACR intentionally uses public networking and does not offer
+          # Premium-only zone redundancy or quarantine/scanning features.
+          checkov \
+            --file "${compiled_template}" \
+            --framework arm \
+            --output cli \
+            --skip-check \
+              CKV_AZURE_139,CKV_AZURE_163,CKV_AZURE_166,CKV_AZURE_233
+
+  azure-preflight-and-what-if:
+    name: 02 / Azure preflight and what-if
+    needs: static-validation
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install pinned Bicep CLI
+        run: az bicep install --version v0.47.16
+
+      - name: Sign in as platform planner
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.PLATFORM_PLAN_CLIENT_ID }}
+          tenant-id: ${{ vars.PLATFORM_AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.PLATFORM_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run guarded what-if
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          {
+            echo '## Platform what-if'
+            echo
+            echo "- Source commit: \`${GITHUB_SHA}\`"
+            echo '- Environment: `production`'
+            echo
+            echo '```text'
+            ./scripts/deploy-platform.sh \
+              what-if \
+              environments/production.json
+            echo '```'
+          } | tee -a "${GITHUB_STEP_SUMMARY}"
+
+  platform-deploy:
+    name: 03 / Approved platform deploy
+    if: >-
+      inputs.operation == 'apply' &&
+      inputs.confirmation == 'deploy rg-platform-production/braddlesunravelsacr'
+    needs: azure-preflight-and-what-if
+    environment:
+      name: platform-production
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      deployment-name: ${{ steps.deploy.outputs.deployment-name }}
+      registry-id: ${{ steps.deploy.outputs.registry-id }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install pinned Bicep CLI
+        run: az bicep install --version v0.47.16
+
+      - name: Sign in as platform deployer
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.PLATFORM_DEPLOY_CLIENT_ID }}
+          tenant-id: ${{ vars.PLATFORM_AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.PLATFORM_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Rerun what-if, deploy, and verify
+        id: deploy
+        shell: bash
+        env:
+          PLATFORM_APPLY_CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+
+          deployment_output="${RUNNER_TEMP}/platform-deploy.out"
+          ./scripts/deploy-platform.sh \
+            apply \
+            environments/production.json \
+            | tee "${deployment_output}"
+
+          deployment_name="$(sed -n 's/^deploymentName=//p' "${deployment_output}")"
+          registry_id="$(sed -n 's/^containerRegistryId=//p' "${deployment_output}")"
+
+          if [[ -z "${deployment_name}" || -z "${registry_id}" ]]; then
+            echo 'Deployment output is incomplete.' >&2
+            exit 1
+          fi
+
+          echo "deployment-name=${deployment_name}" >> "${GITHUB_OUTPUT}"
+          echo "registry-id=${registry_id}" >> "${GITHUB_OUTPUT}"
+
+  post-deploy-verification:
+    name: 04 / Post-deploy verification
+    if: inputs.operation == 'apply'
+    needs: platform-deploy
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Sign in as platform planner
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.PLATFORM_PLAN_CLIENT_ID }}
+          tenant-id: ${{ vars.PLATFORM_AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.PLATFORM_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Verify live platform state
+        run: ./scripts/verify-platform.sh environments/production.json
+
+  summary:
+    name: 05 / Platform summary
+    if: ${{ always() }}
+    needs:
+      - static-validation
+      - azure-preflight-and-what-if
+      - platform-deploy
+      - post-deploy-verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Publish and validate result
+        env:
+          OPERATION: ${{ inputs.operation }}
+          STATIC_RESULT: ${{ needs.static-validation.result }}
+          WHAT_IF_RESULT: ${{ needs.azure-preflight-and-what-if.result }}
+          DEPLOY_RESULT: ${{ needs.platform-deploy.result }}
+          VERIFY_RESULT: ${{ needs.post-deploy-verification.result }}
+          DEPLOYMENT_NAME: ${{ needs.platform-deploy.outputs.deployment-name }}
+          REGISTRY_ID: ${{ needs.platform-deploy.outputs.registry-id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          {
+            echo '## Shared platform result'
+            echo
+            echo "- Source commit: \`${GITHUB_SHA}\`"
+            echo "- Operation: \`${OPERATION}\`"
+            echo '- Subscription: `eb1b0038-3a72-459d-884c-ba2820dc53cc`'
+            echo '- Resource group: `rg-platform-production`'
+            echo "- Static validation: \`${STATIC_RESULT}\`"
+            echo "- What-if: \`${WHAT_IF_RESULT}\`"
+            echo "- Deployment: \`${DEPLOY_RESULT}\`"
+            echo "- Verification: \`${VERIFY_RESULT}\`"
+
+            if [[ -n "${DEPLOYMENT_NAME}" ]]; then
+              echo "- Deployment name: \`${DEPLOYMENT_NAME}\`"
+            fi
+
+            if [[ -n "${REGISTRY_ID}" ]]; then
+              echo "- Registry ID: \`${REGISTRY_ID}\`"
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          [[ "${STATIC_RESULT}" == 'success' ]]
+          [[ "${WHAT_IF_RESULT}" == 'success' ]]
+
+          if [[ "${OPERATION}" == 'apply' ]]; then
+            [[ "${DEPLOY_RESULT}" == 'success' ]]
+            [[ "${VERIFY_RESULT}" == 'success' ]]
+          else
+            [[ "${DEPLOY_RESULT}" == 'skipped' ]]
+            [[ "${VERIFY_RESULT}" == 'skipped' ]]
+          fi

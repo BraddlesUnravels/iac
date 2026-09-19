@@ -2,10 +2,12 @@
 
 import { fileURLToPath } from 'node:url';
 
+import { loadAndValidateEnvironment } from './validate-environment.mjs';
+
 const shaPattern = /^[0-9a-f]{40}$/;
 const digestPattern = /^sha256:[0-9a-f]{64}$/;
 
-export const verifyImage = ({
+const verifyImageAgainstCatalog = ({
   imageTag,
   imageDigest,
   callerSha,
@@ -49,7 +51,11 @@ export const verifyImage = ({
     errors.push('Image digest must be a lowercase sha256 digest');
   }
 
-  if (resolvedDigest && resolvedDigest !== imageDigest) {
+  if (!resolvedDigest) {
+    errors.push('Resolved registry digest is required');
+  } else if (!digestPattern.test(resolvedDigest)) {
+    errors.push('Resolved registry digest must be a lowercase sha256 digest');
+  } else if (resolvedDigest !== imageDigest) {
     errors.push('Resolved registry digest must equal the supplied image digest');
   }
 
@@ -63,23 +69,47 @@ export const verifyImage = ({
   };
 };
 
+export const verifyImage = async ({ catalogPath, ...imageEvidence }) => {
+  const environmentResult = await loadAndValidateEnvironment(catalogPath);
+
+  if (!environmentResult.valid) {
+    return {
+      valid: false,
+      errors: [
+        'Environment validation failed',
+        ...environmentResult.errors,
+      ],
+    };
+  }
+
+  return verifyImageAgainstCatalog({
+    ...imageEvidence,
+    catalog: environmentResult.catalog,
+  });
+};
+
 const main = async () => {
   const [catalogPath, application, imageTag, imageDigest, callerSha, resolvedDigest] =
     process.argv.slice(2);
 
-  if (!catalogPath || !application || !imageTag || !imageDigest || !callerSha) {
+  if (
+    !catalogPath ||
+    !application ||
+    !imageTag ||
+    !imageDigest ||
+    !callerSha ||
+    !resolvedDigest
+  ) {
     throw new Error(
-      'Usage: verify-image.mjs <environment.json> <application> <image-tag> <image-digest> <caller-sha> [resolved-digest]',
+      'Usage: verify-image.mjs <environment.json> <application> <image-tag> <image-digest> <caller-sha> <resolved-digest>',
     );
   }
 
-  const { readFile } = await import('node:fs/promises');
-  const catalog = JSON.parse(await readFile(catalogPath, 'utf8'));
-  const result = verifyImage({
+  const result = await verifyImage({
+    catalogPath,
     imageTag,
     imageDigest,
     callerSha,
-    catalog,
     application,
     resolvedDigest,
   });
