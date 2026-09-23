@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 
 import { loadAndValidateEnvironment } from './validate-environment.mjs';
 
+// GitHub repository_dispatch client_payload allows at most 10 top-level properties.
+// Keep the deploy-critical identity fields required; sourceRunId is optional audit metadata.
 const REQUIRED_PAYLOAD_KEYS = [
   'schemaVersion',
   'application',
@@ -16,8 +18,13 @@ const REQUIRED_PAYLOAD_KEYS = [
   'sourceCommitSha',
   'imageTag',
   'imageDigest',
-  'sourceRunId',
 ];
+
+const OPTIONAL_PAYLOAD_KEYS = ['sourceRunId'];
+const ALLOWED_PAYLOAD_KEYS = new Set([
+  ...REQUIRED_PAYLOAD_KEYS,
+  ...OPTIONAL_PAYLOAD_KEYS,
+]);
 
 const shaPattern = /^[0-9a-f]{40}$/;
 const digestPattern = /^sha256:[0-9a-f]{64}$/;
@@ -62,13 +69,12 @@ export const verifyRelease = async ({
     return { valid: false, errors: ['Release payload must be a JSON object'] };
   }
 
-  const keys = Object.keys(payload).sort();
-  const expectedKeys = [...REQUIRED_PAYLOAD_KEYS].sort();
+  const keys = Object.keys(payload);
 
-  if (keys.join(',') !== expectedKeys.join(',')) {
-    errors.push(
-      `Payload keys must exactly equal: ${REQUIRED_PAYLOAD_KEYS.join(', ')}`,
-    );
+  for (const key of keys) {
+    if (!ALLOWED_PAYLOAD_KEYS.has(key)) {
+      errors.push(`Unexpected payload field: ${key}`);
+    }
   }
 
   for (const key of REQUIRED_PAYLOAD_KEYS) {
@@ -108,11 +114,13 @@ export const verifyRelease = async ({
     !positiveDecimalPattern.test(String(payload.releaseId)),
     'releaseId must be a positive decimal string',
   );
-  rejectField(
-    errors,
-    !positiveDecimalPattern.test(String(payload.sourceRunId)),
-    'sourceRunId must be a positive decimal string',
-  );
+  if ('sourceRunId' in payload) {
+    rejectField(
+      errors,
+      !positiveDecimalPattern.test(String(payload.sourceRunId)),
+      'sourceRunId must be a positive decimal string',
+    );
+  }
   rejectField(
     errors,
     !releaseTagPattern.test(payload.releaseTag),
@@ -280,7 +288,8 @@ export const verifyRelease = async ({
     sourceCommitSha: payload.sourceCommitSha,
     imageTag: payload.imageTag,
     imageDigest: payload.imageDigest,
-    sourceRunId: String(payload.sourceRunId),
+    sourceRunId:
+      'sourceRunId' in payload ? String(payload.sourceRunId) : undefined,
     releaseIdentityKey: `${payload.application}:${payload.releaseId}:${payload.sourceCommitSha}:${payload.imageDigest}`,
     iacRepository: iacRepository ?? null,
     iacRepositoryId: iacRepositoryId ?? null,
