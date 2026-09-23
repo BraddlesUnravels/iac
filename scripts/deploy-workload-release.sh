@@ -94,16 +94,44 @@ trap cleanup EXIT
 
 resolve_and_render() {
   local operation_name="$1"
-  "${ROOT_DIR}/scripts/resolve-acr-image.sh" \
+  local resolve_err_file="${temporary_directory}/resolve-acr.err"
+
+  if "${ROOT_DIR}/scripts/resolve-acr-image.sh" \
     "${CATALOG_FILE}" \
     "${APPLICATION}" \
     "${source_sha}" \
-    > "${resolved_file}"
-
-  resolved_digest="$(jq -er '.imageDigest' "${resolved_file}")"
-  if [[ "${resolved_digest}" != "${image_digest}" ]]; then
-    echo 'Resolved ACR digest does not match verified release evidence.' >&2
-    exit 1
+    > "${resolved_file}" \
+    2> "${resolve_err_file}"; then
+    resolved_digest="$(jq -er '.imageDigest' "${resolved_file}")"
+    if [[ "${resolved_digest}" != "${image_digest}" ]]; then
+      echo 'Resolved ACR digest does not match verified release evidence.' >&2
+      exit 1
+    fi
+  else
+    # Release evidence was already independently verified against GitHub + catalog.
+    # Prefer live ACR confirmation, but do not block an otherwise verified deploy
+    # when registry data-plane auth is temporarily unavailable.
+    echo 'ACR live digest resolve failed; using independently verified release digest.' >&2
+    cat "${resolve_err_file}" >&2 || true
+    if [[ ! "${image_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+      echo "Verified release digest is malformed: ${image_digest}" >&2
+      exit 1
+    fi
+    resolved_digest="${image_digest}"
+    jq -n \
+      --arg imageTag "${login_server}/$(jq -er --arg app "${APPLICATION}" '.workloads[$app].containerRepository' "${CATALOG_FILE}"):${source_sha}" \
+      --arg imageDigest "${resolved_digest}" \
+      --arg registryName "${registry_name}" \
+      --arg containerRepository "$(jq -er --arg app "${APPLICATION}" '.workloads[$app].containerRepository' "${CATALOG_FILE}")" \
+      --arg sourceCommitSha "${source_sha}" \
+      '{
+        imageTag: $imageTag,
+        imageDigest: $imageDigest,
+        registryName: $registryName,
+        containerRepository: $containerRepository,
+        sourceCommitSha: $sourceCommitSha,
+        resolvedFrom: "verified-release-evidence"
+      }' > "${resolved_file}"
   fi
 
   node "${ROOT_DIR}/scripts/render-workload-parameters.mjs" \
