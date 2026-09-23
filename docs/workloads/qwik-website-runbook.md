@@ -30,8 +30,8 @@ Source is public, so IaC can read releases/tags without a source-read App token.
 | --- | --- | --- | --- |
 | Publisher UAMI | Qwik `image-publish` | ACR Repository Writer on `qwik-website` only (`2a1e307c-b015-4ebd-883e-5b7698a07328`) | App RG write, other repos |
 | Pull UAMI | Attached to ACA | ACR Repository Reader on `qwik-website` only (`b93aa761-3e63-49ed-ac28-beffa264f7ac`) | Writer, RG write |
-| Planner UAMI | IaC `production-plan` | RG Reader + what-if + ACR repo Reader | RG write, roleAssignment/write |
-| Deployer UAMI | IaC `production` | RG Contributor + MIO on pull identity | Platform RG, roleAssignment/write |
+| Planner UAMI | IaC `production-plan` | RG Reader + what-if + ACR control-plane Reader + ACR repo Reader | RG write, roleAssignment/write |
+| Deployer UAMI | IaC `production` | RG Contributor + MIO on pull identity + ACR control-plane Reader + ACR repo Reader | Platform RG write, roleAssignment/write |
 | Foundation operator | Manual bootstrap | RG create + IAM at intended scopes | Standing release runtime |
 | Dispatch GitHub App | Qwik dispatch step | `repository_dispatch` to IaC only | Long-lived PAT / Azure |
 
