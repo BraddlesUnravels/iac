@@ -55,19 +55,29 @@ trap cleanup EXIT
 # Exchange it for a repository-scoped access token, then read the immutable digest
 # from the registry manifest API. Suppress the CLI warning on stderr so it cannot
 # contaminate captured JSON.
-refresh_token="$(
-  az acr login \
-    --name "${registry_name}" \
-    --expose-token \
-    --output json \
-    2>/dev/null \
-    | jq -er '.accessToken'
-)"
+login_json_file="${temporary_directory}/acr-login.json"
+login_err_file="${temporary_directory}/acr-login.err"
 
-if [[ -z "${refresh_token}" ]]; then
+if ! az acr login \
+  --name "${registry_name}" \
+  --expose-token \
+  --output json \
+  > "${login_json_file}" \
+  2> "${login_err_file}"; then
   echo 'Unable to obtain an ACR refresh token for repository metadata.' >&2
+  cat "${login_err_file}" >&2 || true
   exit 1
 fi
+
+if ! jq -e 'type == "object" and (.accessToken | type == "string" and length > 0)' \
+  "${login_json_file}" >/dev/null; then
+  echo 'ACR login did not return a JSON refresh token payload.' >&2
+  cat "${login_json_file}" >&2 || true
+  cat "${login_err_file}" >&2 || true
+  exit 1
+fi
+
+refresh_token="$(jq -er '.accessToken' "${login_json_file}")"
 
 exchange_access_token() {
   local scope="$1"
