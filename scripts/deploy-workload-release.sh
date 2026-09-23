@@ -54,7 +54,6 @@ node "${ROOT_DIR}/scripts/validate-environment.mjs" "${CATALOG_FILE}"
 
 subscription_id="$(jq -er '.azure.subscriptionId' "${CATALOG_FILE}")"
 tenant_id="$(jq -er '.azure.tenantId' "${CATALOG_FILE}")"
-location="$(jq -er '.azure.location' "${CATALOG_FILE}")"
 resource_group="$(jq -er --arg app "${APPLICATION}" '.workloads[$app].resourceGroup' "${CATALOG_FILE}")"
 container_app_name="$(jq -er --arg app "${APPLICATION}" '.workloads[$app].containerAppName' "${CATALOG_FILE}")"
 registry_name="$(jq -er '.azure.containerRegistryName' "${CATALOG_FILE}")"
@@ -204,7 +203,7 @@ run_apply() {
 }
 
 run_verify() {
-  local app_json fqdn configured_image ready_state url
+  local app_json fqdn configured_image url
   app_json="$(az containerapp show \
     --name "${container_app_name}" \
     --resource-group "${resource_group}" \
