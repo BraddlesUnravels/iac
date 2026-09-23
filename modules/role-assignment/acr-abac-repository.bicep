@@ -34,9 +34,10 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2025-04-01' e
   name: containerRegistryName
 }
 
-// Exact repository equality conditions (no StartsWith). A missing condition is a hard failure.
-var readerCondition = '(([resource.type] == \'Microsoft.ContainerRegistry/registries/repositories\') && ([resource.name] == \'${repositoryName}\')) || (([resource.type] == \'Microsoft.ContainerRegistry/registries/repositories/metadata\') && ([resource.name] == \'${repositoryName}\'))'
-var writerCondition = '(([resource.type] == \'Microsoft.ContainerRegistry/registries/repositories\') && ([resource.name] == \'${repositoryName}\')) || (([resource.type] == \'Microsoft.ContainerRegistry/registries/repositories/metadata\') && ([resource.name] == \'${repositoryName}\')) || (([resource.type] == \'Microsoft.ContainerRegistry/registries/repositories/content\') && ([resource.name] == \'${repositoryName}\'))'
+// Official Azure ABAC condition format for ACR repository scope.
+// https://learn.microsoft.com/en-us/azure/container-registry/container-registry-rbac-abac-repository-permissions
+var readerCondition = '((!(ActionMatches{\'Microsoft.ContainerRegistry/registries/repositories/content/read\'}) AND !(ActionMatches{\'Microsoft.ContainerRegistry/registries/repositories/metadata/read\'})) OR (@Request[Microsoft.ContainerRegistry/registries/repositories:name] StringEqualsIgnoreCase \'${repositoryName}\'))'
+var writerCondition = '((!(ActionMatches{\'Microsoft.ContainerRegistry/registries/repositories/content/read\'}) AND !(ActionMatches{\'Microsoft.ContainerRegistry/registries/repositories/content/write\'}) AND !(ActionMatches{\'Microsoft.ContainerRegistry/registries/repositories/metadata/read\'}) AND !(ActionMatches{\'Microsoft.ContainerRegistry/registries/repositories/metadata/write\'})) OR (@Request[Microsoft.ContainerRegistry/registries/repositories:name] StringEqualsIgnoreCase \'${repositoryName}\'))'
 
 var condition = roleKind == 'Writer' ? writerCondition : readerCondition
 
