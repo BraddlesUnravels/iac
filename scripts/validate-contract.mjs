@@ -77,10 +77,22 @@ export const validateContract = async (
   const errors = [];
   const workload = catalog.workloads[contract.application];
 
+  if (!callerRepository) {
+    errors.push('Caller repository is required');
+  }
+
+  if (!callerRepositoryId) {
+    errors.push('Caller repository ID is required');
+  }
+
+  if (!callerRepositoryOwnerId) {
+    errors.push('Caller repository owner ID is required');
+  }
+
   if (!workload) {
     return {
       valid: false,
-      errors: [`Unknown application: ${contract.application}`],
+      errors: [...errors, `Unknown application: ${contract.application}`],
     };
   }
 
@@ -200,25 +212,52 @@ export const validateContract = async (
     errors.push('Minimum replicas must not exceed maximum replicas');
   }
 
-  if (contract.customDomain.enabled !== Boolean(workload.customDomainName)) {
+  const catalogHasCustomDomain =
+    workload.customDomainName !== null && workload.certificateResourceId !== null;
+
+  if (contract.customDomain.enabled !== catalogHasCustomDomain) {
     errors.push('Custom-domain intent does not match the environment catalog');
   }
 
   return { valid: errors.length === 0, errors };
 };
 
-const parseOptions = (args) => {
+const allowedOptions = new Set([
+  'caller-repository',
+  'caller-repository-id',
+  'caller-repository-owner-id',
+]);
+
+export const parseOptions = (args) => {
+  if (args.length % 2 !== 0) {
+    throw new Error('Every option must have a non-empty value');
+  }
+
   const options = {};
 
   for (let index = 0; index < args.length; index += 2) {
     const name = args[index];
     const value = args[index + 1];
 
-    if (!name?.startsWith('--') || value === undefined) {
+    if (!name?.startsWith('--')) {
       throw new Error(`Invalid option: ${name ?? ''}`);
     }
 
-    options[name.slice(2)] = value;
+    const optionName = name.slice(2);
+
+    if (!allowedOptions.has(optionName)) {
+      throw new Error(`Unknown option: ${name}`);
+    }
+
+    if (Object.hasOwn(options, optionName)) {
+      throw new Error(`Duplicate option: ${name}`);
+    }
+
+    if (!value?.trim() || value.startsWith('--')) {
+      throw new Error(`Option requires a non-empty value: ${name}`);
+    }
+
+    options[optionName] = value;
   }
 
   return options;
@@ -229,7 +268,7 @@ const main = async () => {
 
   if (!contractPath || !catalogPath) {
     throw new Error(
-      'Usage: validate-contract.mjs <workload.json> <environment.json> [--caller-repository owner/repo] [--caller-repository-id id] [--caller-repository-owner-id id]',
+      'Usage: validate-contract.mjs <workload.json> <environment.json> --caller-repository owner/repo --caller-repository-id id --caller-repository-owner-id id',
     );
   }
 

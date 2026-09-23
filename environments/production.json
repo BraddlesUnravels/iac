@@ -1,0 +1,60 @@
+{
+  "$schema": "../schemas/environment.schema.json",
+  "schemaVersion": 1,
+  "name": "production",
+  "azure": {
+    "subscriptionId": "eb1b0038-3a72-459d-884c-ba2820dc53cc",
+    "tenantId": "f1c96730-73a1-4159-81ab-0bb6731c8e75",
+    "location": "australiaeast",
+    "platformResourceGroup": "rg-platform-production",
+    "containerRegistryName": "braddlesunravelsacr",
+    "containerRegistryLoginServer": "braddlesunravelsacr.azurecr.io",
+    "containerRegistryRoleAssignmentMode": "AbacRepositoryPermissions"
+  },
+  "workloads": {
+    "access-control-demo": {
+      "resourceGroup": "rg-access-control-demo",
+      "stack": "access-control-demo",
+      "repository": "braddlesunravels/access-control-demo",
+      "repositoryId": "1298659298",
+      "repositoryOwnerId": "103235805",
+      "containerRepository": "access-control-demo",
+      "containerAppsEnvironmentName": "aca-access-control-demo",
+      "containerAppName": "aca-access-control-demo",
+      "logAnalyticsWorkspaceName": "log-access-control-demo",
+      "keyVaultName": "kv-acd-prod-braddles",
+      "runtimeIdentityName": "id-access-control-demo-secrets",
+      "publisherIdentityName": "id-access-control-production-publisher",
+      "plannerIdentityName": "id-access-control-production-planner",
+      "deployerIdentityName": "id-access-control-production-deployer",
+      "customDomainName": "aca.braddlesunravels.online",
+      "certificateResourceId": "/subscriptions/eb1b0038-3a72-459d-884c-ba2820dc53cc/resourceGroups/rg-access-control-demo/providers/Microsoft.App/managedEnvironments/aca-access-control-demo/managedCertificates/mc-aca-access-con-aca-braddlesunra-4076",
+      "allowedSecretNames": [
+        "access-gate-code-secret",
+        "access-gate-cookie-secret"
+      ],
+      "migrationSecretNames": [
+        "supabase-access-token",
+        "supabase-db-password"
+      ],
+      "externalEnvironmentVariables": [
+        "NEXT_SUPABASE_URL",
+        "NEXT_SUPABASE_PUBLISHABLE_KEY"
+      ],
+      "bounds": {
+        "targetPorts": [3000],
+        "minReplicas": {
+          "minimum": 1,
+          "maximum": 1
+        },
+        "maxReplicas": {
+          "minimum": 1,
+          "maximum": 1
+        },
+        "healthProbePaths": ["/api/health"],
+        "cpu": ["0.25"],
+        "memory": ["0.5Gi"]
+      }
+    }
+  }
+}

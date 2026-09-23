@@ -1,12 +1,17 @@
-targetScope = 'resourceGroup'
+targetScope = 'subscription'
 
-@description('Azure region for platform resources.')
-param location string = resourceGroup().location
+@description('Azure region for the platform resource group and registry.')
+param location string
 
-@description('Short name used in resource naming.')
-@minLength(2)
-@maxLength(20)
-param namePrefix string = 'shared'
+@description('Platform resource group name.')
+@minLength(1)
+@maxLength(90)
+param resourceGroupName string
+
+@description('Globally unique Azure Container Registry name.')
+@minLength(5)
+@maxLength(50)
+param containerRegistryName string
 
 @description('Deployment environment.')
 @allowed([
@@ -15,105 +20,40 @@ param namePrefix string = 'shared'
   'stage'
   'production'
 ])
-param environment string = 'production'
+param environment string
 
-@description('Optional naming suffix.')
-param suffix string = ''
-
-@description('Application tag value for platform resources.')
-param applicationName string = 'platform'
-
-@description('ACR SKU.')
-@allowed([
-  'Basic'
-  'Standard'
-  'Premium'
-])
-param containerRegistrySku string = 'Basic'
-
-@description('Create a shared Key Vault.')
-param deployKeyVault bool = true
-
-@description('Log Analytics retention in days.')
-param logRetentionInDays int = 30
-
-@description('Extra tags merged into defaults.')
+@description('Extra tags. Mandatory platform tags override matching keys.')
 param additionalTags object = {}
 
-module naming '../modules/naming/main.bicep' = {
-  name: 'naming'
-  params: {
-    namePrefix: namePrefix
-    environment: environment
-    suffix: suffix
-  }
+var mandatoryTags = {
+  application: 'platform'
+  environment: environment
+  managedBy: 'bicep'
 }
 
-module tagsModule '../modules/tags/main.bicep' = {
-  name: 'tags'
-  params: {
-    application: applicationName
-    environment: environment
-    additionalTags: additionalTags
-  }
-}
+var tags = union(additionalTags, mandatoryTags)
 
-module logAnalytics '../modules/log-analytics/main.bicep' = {
-  name: 'log-analytics'
-  params: {
-    location: location
-    name: naming.outputs.logAnalyticsName
-    tags: tagsModule.outputs.tags
-    retentionInDays: logRetentionInDays
-  }
+resource platformResourceGroup 'Microsoft.Resources/resourceGroups@2025-04-01' = {
+  name: resourceGroupName
+  location: location
+  tags: tags
 }
 
 module containerRegistry '../modules/container-registry/main.bicep' = {
   name: 'container-registry'
+  scope: platformResourceGroup
   params: {
     location: location
-    name: naming.outputs.containerRegistryName
-    tags: tagsModule.outputs.tags
-    skuName: containerRegistrySku
-    adminUserEnabled: false
+    name: containerRegistryName
+    tags: tags
   }
 }
 
-module containerAppsEnvironment '../modules/container-apps-environment/main.bicep' = {
-  name: 'container-apps-environment'
-  params: {
-    location: location
-    name: naming.outputs.containerAppsEnvironmentName
-    tags: tagsModule.outputs.tags
-    logAnalyticsWorkspaceId: logAnalytics.outputs.id
-  }
-}
-
-module keyVault '../modules/key-vault/main.bicep' = if (deployKeyVault) {
-  name: 'key-vault'
-  params: {
-    location: location
-    name: naming.outputs.keyVaultName
-    tags: tagsModule.outputs.tags
-  }
-}
-
-output location string = location
-output environment string = environment
-output namePrefix string = namePrefix
-output baseName string = naming.outputs.baseName
-
-output logAnalyticsWorkspaceId string = logAnalytics.outputs.id
-output logAnalyticsWorkspaceCustomerId string = logAnalytics.outputs.customerId
-
+output platformResourceGroupId string = platformResourceGroup.id
+output platformResourceGroupName string = platformResourceGroup.name
 output containerRegistryId string = containerRegistry.outputs.id
 output containerRegistryName string = containerRegistry.outputs.name
 output containerRegistryLoginServer string = containerRegistry.outputs.loginServer
-
-output containerAppsEnvironmentId string = containerAppsEnvironment.outputs.id
-output containerAppsEnvironmentName string = containerAppsEnvironment.outputs.name
-output containerAppsDefaultDomain string = containerAppsEnvironment.outputs.defaultDomain
-
-output keyVaultId string = deployKeyVault ? keyVault!.outputs.id : ''
-output keyVaultName string = deployKeyVault ? keyVault!.outputs.name : ''
-output keyVaultUri string = deployKeyVault ? keyVault!.outputs.uri : ''
+output containerRegistryLocation string = containerRegistry.outputs.location
+output containerRegistrySku string = containerRegistry.outputs.skuName
+output containerRegistryRoleAssignmentMode string = containerRegistry.outputs.roleAssignmentMode

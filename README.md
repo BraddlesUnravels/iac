@@ -4,7 +4,7 @@ Reusable Azure infrastructure and deployment validation built with Bicep.
 
 The target architecture uses one shared Azure Container Registry and keeps each workload's Container Apps environment, observability, Key Vault, identities, and certificates within that workload's lifecycle boundary. The first migration adopts the existing `access-control-demo` resources in place.
 
-The approved architecture is summarized in [docs/reusable-iac-design.md](docs/reusable-iac-design.md). The implementation sequence and stop gates are recorded in [agent-tmp-plans/iac-acr-reviewed-implementation-plan.md](agent-tmp-plans/iac-acr-reviewed-implementation-plan.md).
+The approved architecture is summarized in [docs/reusable-iac-design.md](docs/reusable-iac-design.md). The implementation sequence and stop gates are recorded in [docs/plans/iac-acr-reviewed-implementation-plan.md](docs/plans/iac-acr-reviewed-implementation-plan.md), with the current shared-ACR work in [docs/plans/phase-2-shared-acr-implementation-plan.md](docs/plans/phase-2-shared-acr-implementation-plan.md).
 
 ## Implementation status
 
@@ -19,11 +19,13 @@ Phase 1 provides the validation foundation:
 
 Phase 1 does not deploy or modify Azure resources. The committed fixtures are test data, not a production environment catalog.
 
+Phase 2 adds fail-closed evidence checks and defines the subscription-scoped shared platform: `rg-platform-production` plus the Basic ACR `braddlesunravelsacr`. The platform is deployed, live-state verification passes, and the repeat what-if reports `NoChange`. Repository-scoped ACR permissions, workload identities, and image access remain Phase 3 work. See [docs/operations.md](docs/operations.md) before running an Azure preview.
+
 ## Layout
 
 ```text
 modules/                         # Composable Bicep modules
-platform/                        # Existing shared foundation prototype
+platform/                        # Subscription entry point for shared ACR
 schemas/                         # Environment and workload contracts
 stacks/
   next-supabase/                 # Next.js + hosted Supabase (one Container App)
@@ -90,7 +92,7 @@ The security job compiles every Bicep file to temporary ARM JSON before scanning
 
 ## Deployment status
 
-The existing bootstrap and deployment scripts remain available as prototypes and rollback references. Do not use them as the new production workflow. Platform creation, identity bootstrap, workload adoption, and routine release automation are implemented only after their corresponding plan gates and reviewed Azure `what-if` results.
+Platform deployment is manual and guarded. Static validation requires no Azure login. Azure apply remains blocked until provider registration, planner/deployer OIDC identities, GitHub environment protection, and the exact subscription `what-if` are reviewed and approved.
 
 ## Design notes
 

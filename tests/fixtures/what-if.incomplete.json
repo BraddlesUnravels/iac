@@ -1,0 +1,12 @@
+{
+  "status": "Failed",
+  "properties": {
+    "changes": [],
+    "diagnostics": [
+      {
+        "level": "Error",
+        "message": "The result could not be fully expanded."
+      }
+    ]
+  }
+}

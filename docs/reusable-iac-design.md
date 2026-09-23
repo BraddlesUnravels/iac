@@ -1,8 +1,8 @@
 # Reusable Azure IaC design
 
-Status: approved architecture; Phase 1 validation foundation implemented
+Status: approved architecture; Phase 2 shared ACR deployed and verified
 
-The detailed implementation order, permission model, migration gates, and acceptance criteria are in [../agent-tmp-plans/iac-acr-reviewed-implementation-plan.md](../agent-tmp-plans/iac-acr-reviewed-implementation-plan.md). This document summarizes the durable design.
+The detailed implementation order, permission model, migration gates, and acceptance criteria are in [plans/iac-acr-reviewed-implementation-plan.md](plans/iac-acr-reviewed-implementation-plan.md). The Phase 2 handoff is in [plans/phase-2-shared-acr-implementation-plan.md](plans/phase-2-shared-acr-implementation-plan.md). This document summarizes the durable design.
 
 ## Goal
 
@@ -15,10 +15,10 @@ The first proof is migrating `access-control-demo` without losing any behavior f
 The repository already has a useful foundation:
 
 - `modules/` contains reusable Bicep resources.
-- `platform/` currently contains a shared-foundation prototype. The approved production platform will contain only the shared ACR.
+- `platform/` contains the subscription-scoped shared ACR platform.
 - `stacks/` contains opinionated application shapes rather than one universal template.
 - `scripts/bootstrap-oidc.sh` creates a GitHub OIDC trust and a resource-group-scoped deployment identity.
-- All current Bicep entry points compile with Bicep CLI 0.46.1, and all shell scripts pass `bash -n`.
+- All current Bicep entry points compile with Bicep CLI 0.47.16, and all shell scripts pass `bash -n` and ShellCheck 0.11.0.
 
 The operational reference in `access-control-demo` adds behavior that this repository does not yet preserve:
 
@@ -31,7 +31,7 @@ The operational reference in `access-control-demo` adds behavior that this repos
 
 The current reusable prototype also has several gaps to close before it should deploy production workloads:
 
-- There is no reusable deployment workflow yet. Phase 1 adds static validation only.
+- There is no reusable workload deployment workflow yet. Phase 2 adds the guarded manual platform workflow.
 - Platform outputs must be copied manually into stack parameter files.
 - Secret values are accepted as deployment parameters and stored as Container App secrets instead of using Key Vault references.
 - Key Vault defaults to public access with purge protection disabled.
@@ -139,12 +139,16 @@ Each application repository should commit a non-secret file such as `.azure/work
   "container": {
     "targetPort": 3000,
     "healthProbePath": "/api/health",
+    "cpu": "0.25",
+    "memory": "0.5Gi",
     "minReplicas": 1,
     "maxReplicas": 1
   },
   "env": {
     "NODE_ENV": "production",
     "NEXT_TELEMETRY_DISABLED": "1",
+    "HOSTNAME": "0.0.0.0",
+    "PORT": "3000",
     "ACCESS_GATE_DISABLED": "false"
   },
   "secretRefs": {
@@ -245,15 +249,15 @@ Teardown remains a separate manual workflow. It requires an exact confirmation p
 
 The estimate assumes one engineer familiar with the repositories and excludes Azure DNS/certificate propagation delays.
 
-| Phase | Deliverable | Estimate | Exit criterion |
-| --- | --- | ---: | --- |
-| 0 | Confirm account, environments, naming, RG split, and ACR choice | 0.5 day | Decisions recorded; no deployment |
-| 1 | Harden modules and split privileged RBAC/bootstrap | 1-2 days | Bicep build and Checkov pass; no runtime secret values in parameters |
-| 2 | JSON Schema, fixtures, and contract validator | 1-1.5 days | Valid fixtures pass and unsafe inputs fail before Azure login |
-| 3 | Reusable validate, what-if, deploy, and teardown workflows | 1.5-2 days | OIDC pilot deploy succeeds with protected approval |
-| 4 | Migrate `access-control-demo` with behavior parity | 1-1.5 days | Existing smoke checks pass against the IaC-managed deployment |
-| 5 | Onboard a second application shape | 1-2 days | No Azure deployment logic copied into the app repo |
-| 6 | Versioning, rollback notes, and operator documentation | 0.5-1 day | `v1` release is pinned by both callers |
+| Phase | Deliverable | Exit criterion |
+| --- | --- | --- |
+| 1 | Planning and validation foundation | Unsafe contracts fail before Azure login |
+| 2 | Fail-closed corrections and shared ACR | Reviewed subscription deployment creates only the platform resource group and ACR |
+| 3 | Identities and workload-foundation adoption | Stable workload resources and role assignments are adopted without replacement |
+| 4 | Routine release stack and reusable workflow | Digest deployment passes protected what-if and verification |
+| 5 | Application integration | Application pipeline exposes every quality and deployment stage |
+| 6 | Production migration | ACR-backed revision passes parity and rollback checks |
+| 7 | Post-acceptance cleanup | Obsolete permissions and deployment paths are removed after soak |
 
 Expected total: **9-14 working days** for the production-ready first version. This includes visible job boundaries, narrow identities, OIDC workflow binding, brownfield adoption checks, and repository-isolation tests.
 
@@ -263,11 +267,12 @@ Expected total: **9-14 working days** for the production-ready first version. Th
 - [x] Adopt the existing workload resource group and create a separate shared-ACR resource group.
 - [x] Use private ACR as the production registry while retaining GHCR only as migration rollback.
 - [ ] Capture the existing `access-control-demo` resource names and deployment outputs as migration fixtures.
-- [ ] Move role assignment creation to the privileged platform/bootstrap lane.
+- [ ] Add ACR repository role assignments in Phase 3; Phase 2 creates no data-plane access.
 - [ ] Add user-assigned identity and Key Vault reference support.
 - [ ] Add custom domain and certificate support.
 - [x] Add strict schemas, semantic validators, and safe/unsafe fixtures.
 - [x] Add the separately visible static validation workflow.
+- [x] Deploy and verify the shared Basic ACR with an idempotent second what-if.
 - [ ] Add reusable what-if, deployment, and teardown workflows.
 - [ ] Migrate `access-control-demo` and run its existing production smoke checks.
 - [ ] Onboard the second repository and revise the contract only for proven missing capabilities.
@@ -275,6 +280,6 @@ Expected total: **9-14 working days** for the production-ready first version. Th
 
 ## Remaining deployment gates
 
-Before Azure mutation, approve the generated ACR name and `rg-platform-production`, reconcile the two existing managed certificates, configure the application repository's protected production environment, confirm the trusted foundation operator, and review the corresponding Azure `what-if` output.
+Before Phase 3 Azure mutation, create and review the dedicated planner/deployer identities and OIDC subjects, configure the `platform-production` GitHub environment, reconcile workload role assignments, and review the workload-foundation `what-if`.
 
 No live Azure resource should be changed until these decisions are approved and a `what-if` result has been reviewed.

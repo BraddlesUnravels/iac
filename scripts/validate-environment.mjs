@@ -87,7 +87,17 @@ export const validateEnvironment = async (catalog) => {
       '/providers/Microsoft.App/managedEnvironments/' +
       `${workload.containerAppsEnvironmentName}/`;
 
+    const hasCustomDomain = workload.customDomainName !== null;
+    const hasCertificate = workload.certificateResourceId !== null;
+
+    if (hasCustomDomain !== hasCertificate) {
+      errors.push(
+        `${path}.customDomainName and certificateResourceId must both be set or both be null`,
+      );
+    }
+
     if (
+      hasCertificate &&
       !workload.certificateResourceId
         .toLowerCase()
         .startsWith(certificatePrefix.toLowerCase())
@@ -95,6 +105,14 @@ export const validateEnvironment = async (catalog) => {
       errors.push(
         `${path}.certificateResourceId must belong to the approved subscription, resource group, and Container Apps environment`,
       );
+    }
+
+    if (
+      (workload.allowedSecretNames.length > 0 ||
+        workload.migrationSecretNames.length > 0) &&
+      workload.keyVaultName === null
+    ) {
+      errors.push(`${path}.keyVaultName is required when secret names are configured`);
     }
   }
 
