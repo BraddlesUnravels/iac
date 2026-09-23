@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/environment.schema.json",
+  "$schema": "../../schemas/environment.schema.json",
   "schemaVersion": 1,
   "name": "production",
   "azure": {
@@ -7,8 +7,8 @@
     "tenantId": "f1c96730-73a1-4159-81ab-0bb6731c8e75",
     "location": "australiaeast",
     "platformResourceGroup": "rg-platform-production",
-    "containerRegistryName": "braddlesunravelsacr",
-    "containerRegistryLoginServer": "braddlesunravelsacr.azurecr.io",
+    "containerRegistryName": "acriacvalidation001",
+    "containerRegistryLoginServer": "acriacvalidation001.azurecr.io",
     "containerRegistryRoleAssignmentMode": "AbacRepositoryPermissions"
   },
   "workloads": {
@@ -28,7 +28,7 @@
       "plannerIdentityName": "id-access-control-production-planner",
       "deployerIdentityName": "id-access-control-production-deployer",
       "customDomainName": "aca.braddlesunravels.online",
-      "certificateResourceId": "/subscriptions/eb1b0038-3a72-459d-884c-ba2820dc53cc/resourceGroups/rg-access-control-demo/providers/Microsoft.App/managedEnvironments/aca-access-control-demo/managedCertificates/mc-aca-access-con-aca-braddlesunra-4076",
+      "certificateResourceId": "/subscriptions/eb1b0038-3a72-459d-884c-ba2820dc53cc/resourceGroups/rg-access-control-demo/providers/Microsoft.App/managedEnvironments/aca-access-control-demo/managedCertificates/example-certificate",
       "allowedSecretNames": [
         "access-gate-code-secret",
         "access-gate-cookie-secret"
@@ -65,7 +65,7 @@
       }
     },
     "qwik-website": {
-      "resourceGroup": "rg-qwik-website-production",
+      "resourceGroup": "rg-platform-production",
       "stack": "single-container-web",
       "repository": "BraddlesUnravels/qwik-website",
       "repositoryId": "1367173842",

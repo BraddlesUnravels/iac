@@ -62,6 +62,9 @@ param healthProbePath string = '/health'
 @description('Enable system-assigned managed identity.')
 param enableSystemAssignedIdentity bool = true
 
+@description('User-assigned identity resource IDs to attach to the app.')
+param userAssignedIdentityIds array = []
+
 @description('ACR login server when using managed identity pull. Empty skips registry config.')
 param registryLoginServer string = ''
 
@@ -78,11 +81,33 @@ param activeRevisionsMode string = 'Single'
 @description('Termination grace period seconds.')
 param terminationGracePeriodSeconds int = 30
 
-var identity = enableSystemAssignedIdentity
-  ? {
-      type: 'SystemAssigned'
-    }
-  : null
+var hasUserAssigned = length(userAssignedIdentityIds) > 0
+var hasSystemAssigned = enableSystemAssignedIdentity
+
+var identityType = hasSystemAssigned && hasUserAssigned
+  ? 'SystemAssigned,UserAssigned'
+  : hasSystemAssigned
+      ? 'SystemAssigned'
+      : hasUserAssigned ? 'UserAssigned' : 'None'
+
+var userAssignedIdentities = reduce(
+  userAssignedIdentityIds,
+  {},
+  (current, id) => union(current, {
+    '${id}': {}
+  })
+)
+
+var identity = identityType == 'None'
+  ? null
+  : hasUserAssigned
+      ? {
+          type: identityType
+          userAssignedIdentities: userAssignedIdentities
+        }
+      : {
+          type: identityType
+        }
 
 var registryIdentity = !empty(registryIdentityId)
   ? registryIdentityId

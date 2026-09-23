@@ -10,6 +10,7 @@ const digestPattern = /^sha256:[0-9a-f]{64}$/;
 const verifyImageAgainstCatalog = ({
   imageTag,
   imageDigest,
+  sourceCommitSha,
   callerSha,
   catalog,
   application,
@@ -17,9 +18,17 @@ const verifyImageAgainstCatalog = ({
 }) => {
   const errors = [];
   const workload = catalog.workloads[application];
+  const commitSha = sourceCommitSha ?? callerSha;
 
   if (!workload) {
     return { valid: false, errors: [`Unknown application: ${application}`] };
+  }
+
+  if (!commitSha) {
+    return {
+      valid: false,
+      errors: ['Source commit SHA is required (sourceCommitSha or callerSha)'],
+    };
   }
 
   const escapedLoginServer = catalog.azure.containerRegistryLoginServer.replace(
@@ -41,10 +50,10 @@ const verifyImageAgainstCatalog = ({
     );
   }
 
-  if (!shaPattern.test(callerSha)) {
-    errors.push('Caller SHA must be 40 lowercase hexadecimal characters');
-  } else if (match && match[1] !== callerSha) {
-    errors.push('Image tag SHA must equal the caller SHA');
+  if (!shaPattern.test(commitSha)) {
+    errors.push('Source commit SHA must be 40 lowercase hexadecimal characters');
+  } else if (match && match[1] !== commitSha) {
+    errors.push('Image tag SHA must equal the source commit SHA');
   }
 
   if (!digestPattern.test(imageDigest)) {
@@ -89,19 +98,25 @@ export const verifyImage = async ({ catalogPath, ...imageEvidence }) => {
 };
 
 const main = async () => {
-  const [catalogPath, application, imageTag, imageDigest, callerSha, resolvedDigest] =
-    process.argv.slice(2);
+  const [
+    catalogPath,
+    application,
+    imageTag,
+    imageDigest,
+    sourceCommitSha,
+    resolvedDigest,
+  ] = process.argv.slice(2);
 
   if (
     !catalogPath ||
     !application ||
     !imageTag ||
     !imageDigest ||
-    !callerSha ||
+    !sourceCommitSha ||
     !resolvedDigest
   ) {
     throw new Error(
-      'Usage: verify-image.mjs <environment.json> <application> <image-tag> <image-digest> <caller-sha> <resolved-digest>',
+      'Usage: verify-image.mjs <environment.json> <application> <image-tag> <image-digest> <source-commit-sha> <resolved-digest>',
     );
   }
 
@@ -109,7 +124,7 @@ const main = async () => {
     catalogPath,
     imageTag,
     imageDigest,
-    callerSha,
+    sourceCommitSha,
     application,
     resolvedDigest,
   });

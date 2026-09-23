@@ -6,6 +6,8 @@ const entryPoints = [
   'platform/main.bicep',
   'stacks/next-supabase/main.bicep',
   'stacks/qwik-elysia-postgres/main.bicep',
+  'stacks/single-container-web/main.bicep',
+  'foundations/single-container-web/main.bicep',
 ];
 
 const diagnosticPattern =

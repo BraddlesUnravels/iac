@@ -35,6 +35,23 @@ const validateRange = (range, path, errors) => {
   }
 };
 
+const trackUnique = (map, key, owner, label, errors) => {
+  if (!key) {
+    return;
+  }
+
+  const existing = map.get(key);
+
+  if (existing && existing !== owner) {
+    errors.push(
+      `Duplicate ${label} "${key}" shared by workloads ${existing} and ${owner}`,
+    );
+    return;
+  }
+
+  map.set(key, owner);
+};
+
 export const validateEnvironment = async (catalog) => {
   const validateSchema = await createValidator();
 
@@ -56,6 +73,13 @@ export const validateEnvironment = async (catalog) => {
       `azure.containerRegistryLoginServer must equal ${expectedLoginServer}`,
     );
   }
+
+  const resourceGroups = new Map();
+  const containerAppNames = new Map();
+  const containerRepositories = new Map();
+  const identityNames = new Map();
+  const environmentNames = new Map();
+  const workspaceNames = new Map();
 
   for (const [application, workload] of Object.entries(catalog.workloads)) {
     const path = `workloads.${application}`;
@@ -79,6 +103,19 @@ export const validateEnvironment = async (catalog) => {
       errors.push(
         `${path}.bounds.minReplicas.maximum must not exceed maxReplicas.maximum`,
       );
+    }
+
+    if (
+      workload.resourceGroup.toLowerCase() ===
+      catalog.azure.platformResourceGroup.toLowerCase()
+    ) {
+      errors.push(
+        `${path}.resourceGroup must not target the shared platform resource group`,
+      );
+    }
+
+    if (workload.containerRepository.length > 256) {
+      errors.push(`${path}.containerRepository exceeds ACR repository name limits`);
     }
 
     const certificatePrefix =
@@ -113,6 +150,57 @@ export const validateEnvironment = async (catalog) => {
       workload.keyVaultName === null
     ) {
       errors.push(`${path}.keyVaultName is required when secret names are configured`);
+    }
+
+    trackUnique(
+      resourceGroups,
+      workload.resourceGroup.toLowerCase(),
+      application,
+      'resource group',
+      errors,
+    );
+    trackUnique(
+      containerAppNames,
+      `${workload.resourceGroup.toLowerCase()}/${workload.containerAppName.toLowerCase()}`,
+      application,
+      'container app target',
+      errors,
+    );
+    trackUnique(
+      containerRepositories,
+      workload.containerRepository.toLowerCase(),
+      application,
+      'container repository',
+      errors,
+    );
+    trackUnique(
+      environmentNames,
+      workload.containerAppsEnvironmentName.toLowerCase(),
+      application,
+      'container apps environment name',
+      errors,
+    );
+    trackUnique(
+      workspaceNames,
+      workload.logAnalyticsWorkspaceName.toLowerCase(),
+      application,
+      'log analytics workspace name',
+      errors,
+    );
+
+    for (const identityField of [
+      'runtimeIdentityName',
+      'publisherIdentityName',
+      'plannerIdentityName',
+      'deployerIdentityName',
+    ]) {
+      trackUnique(
+        identityNames,
+        workload[identityField].toLowerCase(),
+        application,
+        identityField,
+        errors,
+      );
     }
   }
 

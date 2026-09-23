@@ -146,3 +146,53 @@ for (const [name, args, messagePattern] of invalidOptionCases) {
     assert.throws(() => parseOptions(args), messagePattern);
   });
 }
+
+const qwikCaller = {
+  callerRepository: 'BraddlesUnravels/qwik-website',
+  callerRepositoryId: '1367173842',
+  callerRepositoryOwnerId: '103235805',
+};
+
+const qwikCatalog = await readFixture('environment.with-qwik.json');
+
+test('accepts the approved qwik single-container production workload', async () => {
+  const result = await validateContract(
+    await readFixture('workload.qwik-valid.json'),
+    qwikCatalog,
+    qwikCaller,
+  );
+
+  assert.equal(result.valid, true, result.errors.join('\n'));
+});
+
+test('still accepts the access-control-demo contract after qwik is added', async () => {
+  const result = await validateContract(
+    await readFixture('workload.valid.json'),
+    qwikCatalog,
+    caller,
+  );
+
+  assert.equal(result.valid, true, result.errors.join('\n'));
+});
+
+test('rejects qwik invalid port', async () => {
+  const result = await validateContract(
+    await readFixture('workload.qwik-invalid-port.json'),
+    qwikCatalog,
+    qwikCaller,
+  );
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /Target port 4000 is not approved/);
+});
+
+test('rejects qwik injected environment variables', async () => {
+  const result = await validateContract(
+    await readFixture('workload.qwik-injected-env.json'),
+    qwikCatalog,
+    qwikCaller,
+  );
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /Environment variables must exactly match/);
+});
