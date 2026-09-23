@@ -36,6 +36,7 @@ require_command() {
 require_command az
 require_command jq
 require_command node
+require_command curl
 
 node "${ROOT_DIR}/scripts/validate-environment.mjs" "${CATALOG_FILE}"
 
@@ -43,40 +44,85 @@ registry_name="$(jq -er '.azure.containerRegistryName' "${CATALOG_FILE}")"
 login_server="$(jq -er '.azure.containerRegistryLoginServer' "${CATALOG_FILE}")"
 container_repository="$(jq -er --arg app "${APPLICATION}" '.workloads[$app].containerRepository' "${CATALOG_FILE}")"
 
-# ABAC registries require an ACR data-plane token. ARM OIDC alone is not enough
-# for az acr repository show against repository content/metadata APIs.
-token="$(az acr login \
-  --name "${registry_name}" \
-  --expose-token \
-  --output tsv \
-  --query accessToken)"
-
-if [[ -z "${token}" ]]; then
-  echo 'Unable to obtain an ACR access token for repository metadata.' >&2
-  exit 1
-fi
-
-metadata_file="$(mktemp)"
-cleanup_metadata() {
-  rm -f "${metadata_file}"
+temporary_directory="$(mktemp -d)"
+chmod 700 "${temporary_directory}"
+cleanup() {
+  rm -rf "${temporary_directory}"
 }
-trap cleanup_metadata EXIT
+trap cleanup EXIT
 
-if ! az acr repository show \
-  --name "${registry_name}" \
-  --image "${container_repository}:${SOURCE_COMMIT_SHA}" \
-  --username '00000000-0000-0000-0000-000000000000' \
-  --password "${token}" \
-  --output json \
-  > "${metadata_file}"; then
-  echo "Unable to read ACR image ${container_repository}:${SOURCE_COMMIT_SHA}." >&2
+# az acr login --expose-token returns an ACR refresh token (despite the field name).
+# Exchange it for a repository-scoped access token, then read the immutable digest
+# from the registry manifest API. Suppress the CLI warning on stderr so it cannot
+# contaminate captured JSON.
+refresh_token="$(
+  az acr login \
+    --name "${registry_name}" \
+    --expose-token \
+    --output json \
+    2>/dev/null \
+    | jq -er '.accessToken'
+)"
+
+if [[ -z "${refresh_token}" ]]; then
+  echo 'Unable to obtain an ACR refresh token for repository metadata.' >&2
   exit 1
 fi
 
-digest="$(jq -er '.digest // .manifest.digest // empty' "${metadata_file}")"
+exchange_access_token() {
+  local scope="$1"
+
+  curl --silent --show-error --fail \
+    --request POST \
+    --header 'Content-Type: application/x-www-form-urlencoded' \
+    --data-urlencode 'grant_type=refresh_token' \
+    --data-urlencode "service=${login_server}" \
+    --data-urlencode "scope=${scope}" \
+    --data-urlencode "refresh_token=${refresh_token}" \
+    "https://${login_server}/oauth2/token" \
+    | jq -er '.access_token'
+}
+
+fetch_manifest() {
+  local access_token="$1"
+  local headers_file="$2"
+  local body_file="$3"
+
+  curl --silent --show-error \
+    --dump-header "${headers_file}" \
+    --output "${body_file}" \
+    --write-out '%{http_code}' \
+    --header "Authorization: Bearer ${access_token}" \
+    --header 'Accept: application/vnd.docker.distribution.manifest.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.oci.image.index.v1+json' \
+    "https://${login_server}/v2/${container_repository}/manifests/${SOURCE_COMMIT_SHA}"
+}
+
+headers_file="${temporary_directory}/manifest.headers"
+body_file="${temporary_directory}/manifest.body"
+
+access_token="$(exchange_access_token "repository:${container_repository}:metadata_read")"
+http_code="$(fetch_manifest "${access_token}" "${headers_file}" "${body_file}")"
+
+if [[ "${http_code}" != '200' ]]; then
+  # metadata_read alone can be insufficient; retry with pull scope.
+  access_token="$(exchange_access_token "repository:${container_repository}:pull")"
+  http_code="$(fetch_manifest "${access_token}" "${headers_file}" "${body_file}")"
+fi
+
+if [[ "${http_code}" != '200' ]]; then
+  echo "Unable to read ACR manifest for ${container_repository}:${SOURCE_COMMIT_SHA} (HTTP ${http_code})." >&2
+  cat "${body_file}" >&2 || true
+  exit 1
+fi
+
+digest="$(
+  awk 'BEGIN{IGNORECASE=1} tolower($1)=="docker-content-digest:" {print $2}' "${headers_file}" \
+    | tr -d '\r' \
+    | tail -n 1
+)"
 
 if [[ -z "${digest}" ]]; then
-  echo 'ACR metadata did not include a digest.' >&2
+  echo 'ACR manifest response did not include Docker-Content-Digest.' >&2
   exit 1
 fi
 
