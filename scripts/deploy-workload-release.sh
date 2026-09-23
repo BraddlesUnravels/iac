@@ -117,18 +117,25 @@ resolve_and_render() {
 
 run_preflight() {
   az group show --name "${resource_group}" --output none
-  az acr show \
+  if ! az acr show \
     --name "${registry_name}" \
     --resource-group "$(jq -er '.azure.platformResourceGroup' "${CATALOG_FILE}")" \
     --query '{name:name,loginServer:loginServer,sku:sku.name,roleMode:roleAssignmentMode,admin:adminUserEnabled}' \
     --output json \
-    > "${temporary_directory}/acr.json"
+    > "${temporary_directory}/acr.json"; then
+    echo "Unable to read ACR control-plane metadata for ${registry_name}." >&2
+    exit 1
+  fi
 
-  jq -e \
+  if ! jq -e \
     --arg login "${login_server}" \
     '(.loginServer == $login) and (.sku == "Basic") and (.roleMode == "AbacRepositoryPermissions") and (.admin == false)' \
     "${temporary_directory}/acr.json" \
-    >/dev/null
+    >/dev/null; then
+    echo 'ACR preflight posture check failed.' >&2
+    cat "${temporary_directory}/acr.json" >&2 || true
+    exit 1
+  fi
 
   resolve_and_render what-if
   echo "preflight=ok"

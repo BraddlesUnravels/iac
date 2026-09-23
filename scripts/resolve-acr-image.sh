@@ -43,12 +43,37 @@ registry_name="$(jq -er '.azure.containerRegistryName' "${CATALOG_FILE}")"
 login_server="$(jq -er '.azure.containerRegistryLoginServer' "${CATALOG_FILE}")"
 container_repository="$(jq -er --arg app "${APPLICATION}" '.workloads[$app].containerRepository' "${CATALOG_FILE}")"
 
-metadata="$(az acr repository show \
+# ABAC registries require an ACR data-plane token. ARM OIDC alone is not enough
+# for az acr repository show against repository content/metadata APIs.
+token="$(az acr login \
+  --name "${registry_name}" \
+  --expose-token \
+  --output tsv \
+  --query accessToken)"
+
+if [[ -z "${token}" ]]; then
+  echo 'Unable to obtain an ACR access token for repository metadata.' >&2
+  exit 1
+fi
+
+metadata_file="$(mktemp)"
+cleanup_metadata() {
+  rm -f "${metadata_file}"
+}
+trap cleanup_metadata EXIT
+
+if ! az acr repository show \
   --name "${registry_name}" \
   --image "${container_repository}:${SOURCE_COMMIT_SHA}" \
-  --output json)"
+  --username '00000000-0000-0000-0000-000000000000' \
+  --password "${token}" \
+  --output json \
+  > "${metadata_file}"; then
+  echo "Unable to read ACR image ${container_repository}:${SOURCE_COMMIT_SHA}." >&2
+  exit 1
+fi
 
-digest="$(jq -er '.digest // .manifest.digest // empty' <<<"${metadata}")"
+digest="$(jq -er '.digest // .manifest.digest // empty' "${metadata_file}")"
 
 if [[ -z "${digest}" ]]; then
   echo 'ACR metadata did not include a digest.' >&2
