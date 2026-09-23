@@ -164,6 +164,40 @@ module publisherWriter '../../modules/role-assignment/acr-abac-repository.bicep'
   }
 }
 
+// Deploy preflight/apply resolve images via az acr show + repository show.
+module deployerRepoReader '../../modules/role-assignment/acr-abac-repository.bicep' = {
+  name: 'acr-deployer-reader'
+  scope: resourceGroup(platformResourceGroupName)
+  params: {
+    containerRegistryName: containerRegistryName
+    principalId: resources.outputs.deployerIdentityPrincipalId
+    repositoryName: containerRepositoryName
+    roleKind: 'Reader'
+    roleDefinitionId: repositoryReaderRoleId
+    nameSeed: 'qwik-deployer'
+  }
+}
+
+module plannerAcrReader '../../modules/role-assignment/acr-registry-reader.bicep' = {
+  name: 'acr-planner-control-plane-reader'
+  scope: resourceGroup(platformResourceGroupName)
+  params: {
+    containerRegistryName: containerRegistryName
+    principalId: resources.outputs.plannerIdentityPrincipalId
+    nameSeed: 'qwik-planner'
+  }
+}
+
+module deployerAcrReader '../../modules/role-assignment/acr-registry-reader.bicep' = {
+  name: 'acr-deployer-control-plane-reader'
+  scope: resourceGroup(platformResourceGroupName)
+  params: {
+    containerRegistryName: containerRegistryName
+    principalId: resources.outputs.deployerIdentityPrincipalId
+    nameSeed: 'qwik-deployer'
+  }
+}
+
 module workloadRoles '../../modules/role-assignment/workload-roles.bicep' = {
   name: 'workload-roles'
   scope: appResourceGroup
