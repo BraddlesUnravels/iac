@@ -46,10 +46,12 @@ Source is public, so IaC can read releases/tags without a source-read App token.
 3. Install GitHub App on IaC repo; store in source:
    - var `IAC_DISPATCH_APP_ID`
    - secret `IAC_DISPATCH_APP_PRIVATE_KEY`
-4. Choose OIDC subject format (legacy vs immutable). Example legacy subjects:
-   - Publisher: `repo:BraddlesUnravels/qwik-website:environment:image-publish`
-   - Planner: `repo:BraddlesUnravels/iac:environment:production-plan`
-   - Deployer: `repo:BraddlesUnravels/iac:environment:production`
+4. OIDC subjects must match the **actual** GitHub token `sub` claim.
+   These repositories use **immutable** subjects (verified live on release):
+   - Publisher: `repo:BraddlesUnravels@103235805/qwik-website@1367173842:environment:image-publish`
+   - Planner: `repo:BraddlesUnravels@103235805/iac@1323677104:environment:production-plan`
+   - Deployer: `repo:BraddlesUnravels@103235805/iac@1323677104:environment:production`
+   Do not use legacy `repo:Owner/Name:environment:...` subjects for these repos.
 5. Validate locally: `npm ci --ignore-scripts && npm run validate`
 6. Subscription-scope foundation what-if then apply (operator identity):
 
@@ -69,9 +71,9 @@ az deployment sub what-if \
     publisherIdentityName=id-qwik-website-publisher \
     plannerIdentityName=id-qwik-website-planner \
     deployerIdentityName=id-qwik-website-deployer \
-    publisherOidcSubject='repo:BraddlesUnravels/qwik-website:environment:image-publish' \
-    plannerOidcSubject='repo:BraddlesUnravels/iac:environment:production-plan' \
-    deployerOidcSubject='repo:BraddlesUnravels/iac:environment:production'
+    publisherOidcSubject='repo:BraddlesUnravels@103235805/qwik-website@1367173842:environment:image-publish' \
+    plannerOidcSubject='repo:BraddlesUnravels@103235805/iac@1323677104:environment:production-plan' \
+    deployerOidcSubject='repo:BraddlesUnravels@103235805/iac@1323677104:environment:production'
 ```
 
 7. Read back role assignments: principal, role ID, condition version 2.0, scope=ACR.
