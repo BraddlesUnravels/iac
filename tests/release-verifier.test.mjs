@@ -123,7 +123,19 @@ test('rejects extra payload properties', async () => {
   });
 
   assert.equal(result.valid, false);
-  assert.match(result.errors.join('\n'), /Payload keys must exactly equal/);
+  assert.match(result.errors.join('\n'), /Unexpected payload field/);
+});
+
+test('accepts payload without optional sourceRunId', async () => {
+  const { sourceRunId: _ignored, ...payloadWithoutRunId } = validPayload;
+  const result = await verifyRelease({
+    payload: payloadWithoutRunId,
+    catalog,
+    githubClient: createGithubClient(),
+  });
+
+  assert.equal(result.valid, true, result.errors.join('\n'));
+  assert.equal(result.evidence.sourceRunId, undefined);
 });
 
 test('treats GitHub API failures as deployment blockers', async () => {
