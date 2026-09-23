@@ -1,0 +1,12 @@
+{
+  "status": "Succeeded",
+  "properties": {
+    "diagnostics": [],
+    "changes": [
+      {
+        "resourceId": "/subscriptions/eb1b0038-3a72-459d-884c-ba2820dc53cc/resourceGroups/rg-platform-production/providers/Microsoft.ContainerRegistry/registries/braddlesunravelsacr",
+        "changeType": "Modify"
+      }
+    ]
+  }
+}

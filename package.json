@@ -9,7 +9,7 @@
   "scripts": {
     "test": "node --test tests/*.test.mjs",
     "validate:environment": "node scripts/validate-environment.mjs environments/production.json",
-    "validate:examples": "node scripts/validate-contract.mjs tests/fixtures/workload.valid.json environments/production.json --caller-repository braddlesunravels/access-control-demo --caller-repository-id 1298659298 --caller-repository-owner-id 103235805",
+    "validate:examples": "node scripts/validate-contract.mjs tests/fixtures/workload.valid.json environments/production.json --caller-repository braddlesunravels/access-control-demo --caller-repository-id 1298659298 --caller-repository-owner-id 103235805 && node scripts/validate-contract.mjs workloads/qwik-website/production.json environments/production.json --caller-repository BraddlesUnravels/qwik-website --caller-repository-id 1367173842 --caller-repository-owner-id 103235805",
     "validate:bicep": "node scripts/validate-bicep.mjs",
     "validate": "npm test && npm run validate:environment && npm run validate:examples && npm run validate:bicep"
   },

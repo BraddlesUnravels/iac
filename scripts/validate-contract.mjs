@@ -18,6 +18,17 @@ const productionStackPolicies = {
       NODE_ENV: 'production',
       PORT: '3000',
     },
+    requireEmptySecretRefs: false,
+    requireCustomDomainDisabled: false,
+  },
+  'single-container-web': {
+    environment: {
+      NODE_ENV: 'production',
+      PORT: '3000',
+      HOST: '0.0.0.0',
+    },
+    requireEmptySecretRefs: true,
+    requireCustomDomainDisabled: true,
   },
 };
 
@@ -144,6 +155,16 @@ export const validateContract = async (
       if (contract.env[name] !== expectedValue) {
         errors.push(`${name} must equal ${expectedValue}`);
       }
+    }
+
+    if (policy.requireEmptySecretRefs) {
+      if (Object.keys(contract.secretRefs).length > 0) {
+        errors.push('Secret references must be empty for this stack');
+      }
+    }
+
+    if (policy.requireCustomDomainDisabled && contract.customDomain.enabled) {
+      errors.push('Custom domain must be disabled for this stack');
     }
   }
 

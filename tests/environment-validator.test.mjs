@@ -57,3 +57,29 @@ for (const [fixture, messagePattern] of invalidCapabilityFixtures) {
     assert.match(result.errors.join('\n'), messagePattern);
   });
 }
+
+test('accepts the production catalog that includes qwik-website', async () => {
+  const result = await validateEnvironment(
+    await readFixture('environment.with-qwik.json'),
+  );
+
+  assert.equal(result.valid, true, result.errors.join('\n'));
+});
+
+test('rejects a workload targeting the shared platform resource group', async () => {
+  const result = await validateEnvironment(
+    await readFixture('environment.platform-rg-collision.json'),
+  );
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /shared platform resource group/);
+});
+
+test('rejects duplicate container app targets across workloads', async () => {
+  const result = await validateEnvironment(
+    await readFixture('environment.duplicate-app-name.json'),
+  );
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /Duplicate container app target/);
+});

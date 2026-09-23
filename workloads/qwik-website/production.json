@@ -1,0 +1,24 @@
+{
+  "$schema": "../../schemas/workload.schema.json",
+  "schemaVersion": 1,
+  "application": "qwik-website",
+  "stack": "single-container-web",
+  "environment": "production",
+  "container": {
+    "targetPort": 3000,
+    "healthProbePath": "/health",
+    "cpu": "0.25",
+    "memory": "0.5Gi",
+    "minReplicas": 1,
+    "maxReplicas": 1
+  },
+  "env": {
+    "NODE_ENV": "production",
+    "PORT": "3000",
+    "HOST": "0.0.0.0"
+  },
+  "secretRefs": {},
+  "customDomain": {
+    "enabled": false
+  }
+}

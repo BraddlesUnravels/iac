@@ -56,6 +56,9 @@ jobs:
           node --test
           tests/contract-validator.test.mjs
           tests/image-validator.test.mjs
+          tests/release-verifier.test.mjs
+          tests/workload-what-if-validator.test.mjs
+          tests/platform-what-if-validator.test.mjs
 
   bicep-build:
     name: 03 / Bicep build

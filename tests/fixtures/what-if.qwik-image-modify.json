@@ -1,0 +1,19 @@
+{
+  "status": "Succeeded",
+  "properties": {
+    "diagnostics": [],
+    "changes": [
+      {
+        "resourceId": "/subscriptions/eb1b0038-3a72-459d-884c-ba2820dc53cc/resourceGroups/rg-qwik-website-production/providers/Microsoft.App/containerApps/aca-qwik-website-production",
+        "changeType": "Modify",
+        "resourceType": "Microsoft.App/containerApps",
+        "delta": [
+          {
+            "path": "properties.template.containers[0].image",
+            "propertyChangeType": "Modify"
+          }
+        ]
+      }
+    ]
+  }
+}

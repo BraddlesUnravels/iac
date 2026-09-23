@@ -65,3 +65,22 @@ test('rejects an invalid environment catalog', async () => {
   assert.equal(result.valid, false);
   assert.match(result.errors.join('\n'), /Environment validation failed/);
 });
+
+test('accepts sourceCommitSha alias without confusing it with an IaC checkout SHA', async () => {
+  const result = await verify({
+    callerSha: undefined,
+    sourceCommitSha: imageCases.callerSha,
+  });
+
+  assert.equal(result.valid, true, result.errors.join('\n'));
+});
+
+test('rejects when only an unrelated IaC sha is supplied as sourceCommitSha', async () => {
+  const result = await verify({
+    callerSha: undefined,
+    sourceCommitSha: imageCases.differentSha,
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /Image tag SHA must equal/);
+});
