@@ -1,13 +1,22 @@
-# Stack: qwik-elysia-postgres
+# Stack: qwik-elysia-postgres (prototype)
 
-Azure resources for a Qwik UI + Elysia API + PostgreSQL application, matching `fullstack-architecture-demo`.
+**Status: prototype only — production selection is rejected by validators.**
 
-## Resources
+Azure resources for a Qwik UI + Elysia API + PostgreSQL application shape,
+roughly matching `fullstack-architecture-demo` experiments.
+
+This is **not** the production Qwik path. Production Qwik uses
+`stacks/single-container-web` with no Azure database.
+
+`access-control-demo` is also **not** deployed by this stack and is not migrated
+into this repository yet.
+
+## Intended shape
 
 - Azure Database for PostgreSQL Flexible Server + application database
 - Container App for Elysia API (external ingress, port 4000)
 - Container App for Qwik UI (external ingress, port 3000)
-- AcrPull role assignments for both app identities when ACR name is provided
+- Optional classic `AcrPull` role assignments when an ACR name is provided
 
 ## Environment wiring
 
@@ -24,24 +33,28 @@ postgresql://{login}:{password}@{fqdn}:5432/{database}?sslmode=require
 
 ## CORS note
 
-The UI URL is only known after the UI app is created. For a first deploy you can leave `corsOriginOverride` empty, then set it to the `uiUrl` output and redeploy so the API receives `CORS_ORIGIN`.
+The UI URL is only known after the UI app is created. For a first lab deploy you
+can leave `corsOriginOverride` empty, then set it to the `uiUrl` output and
+redeploy so the API receives `CORS_ORIGIN`.
 
-## Prerequisites
+## Prerequisites (local prototype deploys)
 
-1. Platform stack deployed (ACA environment + ACR)
-2. API and UI images pushed to ACR
-3. Strong PostgreSQL admin password and JWT secret
+1. Shared platform ACR exists (`platform/` → ACR only; **not** an ACA environment).
+2. A Container Apps environment ID you already control.
+3. API and UI images available to that environment.
+4. Strong PostgreSQL admin password and JWT secret for lab use only — never commit them.
 
-## Deploy
+## Local helper deploy
 
 ```bash
 cp stacks/qwik-elysia-postgres/main.bicepparam stacks/qwik-elysia-postgres/main.local.bicepparam
-# fill platform outputs, images, secrets
+# fill environment ID, images, secrets — never commit secrets
 ./scripts/deploy-stack.sh qwik-elysia-postgres stacks/qwik-elysia-postgres/main.local.bicepparam
 ```
 
 ## Notes
 
-- Public PostgreSQL access with the Azure services firewall rule is intentional for demo simplicity.
-- Prefer commit-SHA image tags for immutable releases.
-- Redis is out of scope for v1.
+- Public PostgreSQL access with the Azure services firewall rule is intentional for demo simplicity only.
+- Prefer commit-SHA image tags.
+- Redis remains out of scope.
+- Do not enable this stack for the production environment catalog.
