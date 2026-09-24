@@ -87,29 +87,32 @@ az deployment sub what-if \
 
 ## Custom domain and sticky managed certificate
 
-Live production hostname:
+Live production hostnames:
 
 ```text
-www.braddlesunravels.online
+www.braddlesunravels.online   (primary / AZURE_CUSTOM_DOMAIN)
+braddlesunravels.online        (additional sticky binding)
 ```
 
-Managed certificate (environment-scoped, create once):
+Managed certificates (environment-scoped, create once):
 
 ```text
-/subscriptions/eb1b0038-3a72-459d-884c-ba2820dc53cc/resourceGroups/rg-qwik-website-production/providers/Microsoft.App/managedEnvironments/acae-qwik-website-production/managedCertificates/mc-qwik-www-braddlesunravels-online
+.../managedCertificates/mc-qwik-www-braddlesunravels-online
+.../managedCertificates/mc-qwik-apex-braddlesunravels-online
 ```
 
 Ownership:
 
-- Hostname + certificate resource ID live in the IaC catalog (`environments/production.json`).
+- Primary hostname + cert ID and `additionalCustomDomains[]` live in the IaC catalog.
 - Workload contract only sets `customDomain.enabled`.
-- Every routine deploy re-asserts `ingress.customDomains` with `bindingType: SniEnabled`.
-- Runtime env always receives `AZURE_CUSTOM_DOMAIN` (same name across apps). Do not put that name in the app contract.
+- Every routine deploy re-asserts all `ingress.customDomains` with `bindingType: SniEnabled`.
+- Runtime env always receives `AZURE_CUSTOM_DOMAIN` for the primary hostname only (same name across apps).
 
-Operator DNS prerequisites before first cert issuance:
+Operator DNS prerequisites:
 
-1. `CNAME www` → Container App default FQDN
-2. `TXT asuid.www` → app `customDomainVerificationId`
+1. `CNAME www` → Container App default FQDN + `TXT asuid.www`
+2. Apex `A @` → qwik env static IP + `TXT asuid`
+3. Keep `aca.braddlesunravels.online` on its own CNAME (access-control-demo); unrelated to apex A
 
 ## Rollback
 

@@ -270,6 +270,26 @@
             }
           ]
         },
+        "additionalCustomDomains": {
+          "type": "array",
+          "default": [],
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "certificateResourceId"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "format": "hostname"
+              },
+              "certificateResourceId": {
+                "type": "string",
+                "pattern": "^/subscriptions/[0-9a-fA-F-]{36}/resourceGroups/[^/]+/providers/Microsoft\\.App/managedEnvironments/[^/]+/(?:managedCertificates|certificates)/[^/]+$"
+              }
+            }
+          }
+        },
         "allowedSecretNames": {
           "type": "array",
           "uniqueItems": true,

@@ -278,6 +278,23 @@ run_verify() {
       exit 1
     fi
 
+    while IFS=$'\t' read -r extra_host extra_cert; do
+      [[ -z "${extra_host}" ]] && continue
+      extra_bound="$(jq -er --arg host "${extra_host}" '
+        (.properties.configuration.ingress.customDomains // [])
+        | map(select(.name == $host and .bindingType == "SniEnabled"))
+        | .[0].certificateId // empty
+      ' <<<"${app_json}")"
+      if [[ "${extra_bound}" != "${extra_cert}" ]]; then
+        echo "Sticky additional domain binding missing or mismatched for ${extra_host}" >&2
+        exit 1
+      fi
+    done < <(jq -r --arg app "${APPLICATION}" '
+      (.workloads[$app].additionalCustomDomains // [])
+      | .[]
+      | "\(.name)\t\(.certificateResourceId)"
+    ' "${CATALOG_FILE}")
+
     azure_custom_domain="$(jq -er '
       (.properties.template.containers[0].env // [])
       | map(select(.name == "AZURE_CUSTOM_DOMAIN"))

@@ -54,6 +54,9 @@ param customDomainName string = ''
 @description('Existing managed certificate resource ID. Required when customDomainName is set.')
 param customDomainCertificateId string = ''
 
+@description('Additional sticky hostname bindings: [{ name, certificateId }].')
+param additionalCustomDomains array = []
+
 var mandatoryTags = {
   application: application
   environment: environment
@@ -99,6 +102,7 @@ module webApp '../../modules/container-app/main.bicep' = {
     activeRevisionsMode: 'Single'
     customDomainName: customDomainName
     customDomainCertificateId: customDomainCertificateId
+    additionalCustomDomains: additionalCustomDomains
   }
 }
 
