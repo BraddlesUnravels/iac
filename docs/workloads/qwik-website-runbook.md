@@ -85,6 +85,32 @@ az deployment sub what-if \
 10. Publish first stable Qwik release; approve IaC `production` if required.
 11. Second release + same-release replay + confirm access-control-demo/ACR unchanged.
 
+## Custom domain and sticky managed certificate
+
+Live production hostname:
+
+```text
+www.braddlesunravels.online
+```
+
+Managed certificate (environment-scoped, create once):
+
+```text
+/subscriptions/eb1b0038-3a72-459d-884c-ba2820dc53cc/resourceGroups/rg-qwik-website-production/providers/Microsoft.App/managedEnvironments/acae-qwik-website-production/managedCertificates/mc-qwik-www-braddlesunravels-online
+```
+
+Ownership:
+
+- Hostname + certificate resource ID live in the IaC catalog (`environments/production.json`).
+- Workload contract only sets `customDomain.enabled`.
+- Every routine deploy re-asserts `ingress.customDomains` with `bindingType: SniEnabled`.
+- Runtime env always receives `AZURE_CUSTOM_DOMAIN` (same name across apps). Do not put that name in the app contract.
+
+Operator DNS prerequisites before first cert issuance:
+
+1. `CNAME www` → Container App default FQDN
+2. `TXT asuid.www` → app `customDomainVerificationId`
+
 ## Rollback
 
 No automatic rollback. Keep last known good digest in GitHub Deployments metadata.

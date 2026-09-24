@@ -48,6 +48,12 @@ param environment string = 'production'
 @description('Extra tags.')
 param additionalTags object = {}
 
+@description('Optional custom hostname. Empty skips sticky domain binding.')
+param customDomainName string = ''
+
+@description('Existing managed certificate resource ID. Required when customDomainName is set.')
+param customDomainCertificateId string = ''
+
 var mandatoryTags = {
   application: application
   environment: environment
@@ -91,6 +97,8 @@ module webApp '../../modules/container-app/main.bicep' = {
     secrets: {}
     secretEnvVars: []
     activeRevisionsMode: 'Single'
+    customDomainName: customDomainName
+    customDomainCertificateId: customDomainCertificateId
   }
 }
 
@@ -98,6 +106,7 @@ output id string = webApp.outputs.id
 output name string = webApp.outputs.name
 output fqdn string = webApp.outputs.fqdn
 output url string = webApp.outputs.url
+output customDomainName string = webApp.outputs.customDomainName
 output environmentId string = containerAppsEnvironment.id
 output runtimeIdentityId string = runtimeIdentity.id
 output image string = imageDigestReference
