@@ -1,10 +1,21 @@
 # Azure IaC with ACR: reviewed implementation plan
 
-Status: implementation-ready plan pending user approval and preflight gates
+> **Historical plan (archived).** Written 18 September 2026 as an implementation-ready
+> review. It is **not** live repository status. Several “current state” claims inside
+> (no ACR yet, Bicep 0.46.1, access-control as first deployed workload) are outdated.
+>
+> **Authoritative status:** root [README](../../README.md) and
+> [reusable-iac-design.md](../reusable-iac-design.md).
+>
+> **What landed after this plan:** shared ACR platform; Qwik foundation + release path;
+> sticky custom domains. **What has not:** this repository still does **not** deploy
+> `access-control-demo` — that brownfield migration is next.
+
+Status at authoring time: implementation-ready plan pending user approval and preflight gates
 
 Primary repository: `iac`
 
-First workload: `access-control-demo`
+Originally targeted first workload: `access-control-demo` (still the next migration; Qwik shipped first as a greenfield proof)
 
 Review date: 18 September 2026
 

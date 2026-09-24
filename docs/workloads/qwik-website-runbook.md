@@ -1,8 +1,24 @@
 # Qwik website release-driven deployment runbook
 
-**Code-only status:** foundation, stack, validators, and workflows are implemented
-in this repository. Live Azure foundation apply, GitHub App installation,
-environment protection, and the first stable source release require an operator.
+Last documentation pass: 2026-09-24.
+
+## Status
+
+| Layer | State |
+| --- | --- |
+| Foundation Bicep (`foundations/single-container-web`) | Implemented |
+| Release stack (`stacks/single-container-web`) | Implemented |
+| Contract + catalog | `workloads/qwik-website/production.json`, `environments/production.json` |
+| IaC workflow | `.github/workflows/deploy-qwik-release.yml` |
+| Sticky custom domains (`www` + apex) | Implemented |
+| Live Azure foundation / GitHub App / env protection | Operator-owned; follow bootstrap below |
+
+This is the **production path** currently managed by this repository.
+
+`access-control-demo` is **not** deployed or migrated here yet. Keep its DNS
+(`aca.braddlesunravels.online`) and Azure resources untouched by Qwik operations.
+That brownfield migration is next; see the root README and
+[../reusable-iac-design.md](../reusable-iac-design.md).
 
 ## Verified GitHub identities
 
@@ -23,6 +39,8 @@ Source is public, so IaC can read releases/tags without a source-read App token.
 3. IaC `deploy-qwik-release.yml` on default branch verifies payload independently,
    plans with planner UAMI, waits on protected `production` if configured,
    re-verifies, applies only the Qwik Container App, verifies HTTP.
+
+Shared ACR platform prerequisites: [../operations.md](../operations.md).
 
 ## Role matrix (fill live assignment IDs after foundation apply)
 
@@ -83,7 +101,8 @@ az deployment sub what-if \
      `QWIK_AZURE_TENANT_ID`, `QWIK_AZURE_SUBSCRIPTION_ID`
 9. Merge IaC dispatch workflow to default branch **before** enabling source releases.
 10. Publish first stable Qwik release; approve IaC `production` if required.
-11. Second release + same-release replay + confirm access-control-demo/ACR unchanged.
+11. Second release + same-release replay + confirm `access-control-demo` and unrelated
+    ACR repositories remain unchanged.
 
 ## Custom domain and sticky managed certificate
 
@@ -112,7 +131,7 @@ Operator DNS prerequisites:
 
 1. `CNAME www` → Container App default FQDN + `TXT asuid.www`
 2. Apex `A @` → qwik env static IP + `TXT asuid`
-3. Keep `aca.braddlesunravels.online` on its own CNAME (access-control-demo); unrelated to apex A
+3. Keep `aca.braddlesunravels.online` on its own CNAME (`access-control-demo`); unrelated to apex A
 
 ## Rollback
 
@@ -131,3 +150,10 @@ npm run validate:bicep
 npm run validate
 bash -n scripts/*.sh
 ```
+
+## Related documentation
+
+- [../../README.md](../../README.md)
+- [../operations.md](../operations.md) — shared ACR platform
+- [../../foundations/single-container-web/README.md](../../foundations/single-container-web/README.md)
+- [../../stacks/single-container-web/README.md](../../stacks/single-container-web/README.md)

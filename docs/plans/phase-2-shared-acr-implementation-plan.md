@@ -1,8 +1,18 @@
 # Phase 2 implementation plan: fail-closed validation and shared Azure Container Registry
 
-Status: implementation handoff  
-Target branch: `feat/iac-phase-2-shared-acr`  
-Repository baseline: commit `e1c8fd355be98f52cb70ec4a8345d4a051144d86` (`feat/iac-first-phase-foundation`)  
+> **Historical plan (archived).** Prepared 2026-09-19 as an implementation handoff.
+> Phase 2 outcomes (fail-closed validation + shared Basic ACR) are **complete on
+> `main`**. Do not treat target-branch or pre-apply wording below as current status.
+>
+> **Authoritative status:** root [README](../../README.md),
+> [operations.md](../operations.md), and [reusable-iac-design.md](../reusable-iac-design.md).
+>
+> Later work beyond this plan includes the Qwik foundation/release path. This
+> repository still does **not** deploy `access-control-demo` (next migration).
+
+Status at authoring time: implementation handoff  
+Original target branch: `feat/iac-phase-2-shared-acr` (merged; live on `main`)  
+Repository baseline at authoring: commit `e1c8fd355be98f52cb70ec4a8345d4a051144d86` (`feat/iac-first-phase-foundation`)  
 Prepared: 2026-09-19
 
 ## 1. Objective
