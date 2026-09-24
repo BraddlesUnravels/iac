@@ -24,6 +24,12 @@ export const renderWorkloadParameters = ({
   const customDomainCertificateId = customDomainEnabled
     ? workload.certificateResourceId
     : '';
+  const additionalCustomDomains = customDomainEnabled
+    ? (workload.additionalCustomDomains ?? []).map((domain) => ({
+        name: domain.name,
+        certificateId: domain.certificateResourceId,
+      }))
+    : [];
 
   return {
     $schema:
@@ -56,6 +62,7 @@ export const renderWorkloadParameters = ({
       environment: { value: contract.environment },
       customDomainName: { value: customDomainName ?? '' },
       customDomainCertificateId: { value: customDomainCertificateId ?? '' },
+      additionalCustomDomains: { value: additionalCustomDomains },
     },
     metadata: {
       sourceCommitSha: evidence.sourceCommitSha,

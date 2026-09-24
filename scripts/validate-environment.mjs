@@ -144,6 +144,44 @@ export const validateEnvironment = async (catalog) => {
       );
     }
 
+    const additionalCustomDomains = workload.additionalCustomDomains ?? [];
+
+    if (additionalCustomDomains.length > 0 && !hasCustomDomain) {
+      errors.push(
+        `${path}.additionalCustomDomains requires customDomainName and certificateResourceId`,
+      );
+    }
+
+    const domainNames = new Set(
+      hasCustomDomain ? [workload.customDomainName.toLowerCase()] : [],
+    );
+
+    for (const [index, domain] of additionalCustomDomains.entries()) {
+      const domainPath = `${path}.additionalCustomDomains[${index}]`;
+      const domainName = String(domain.name ?? '').toLowerCase();
+
+      if (!domainName) {
+        errors.push(`${domainPath}.name is required`);
+        continue;
+      }
+
+      if (domainNames.has(domainName)) {
+        errors.push(`${domainPath}.name duplicates another custom domain`);
+      }
+
+      domainNames.add(domainName);
+
+      if (
+        !String(domain.certificateResourceId ?? '')
+          .toLowerCase()
+          .startsWith(certificatePrefix.toLowerCase())
+      ) {
+        errors.push(
+          `${domainPath}.certificateResourceId must belong to the approved subscription, resource group, and Container Apps environment`,
+        );
+      }
+    }
+
     if (
       (workload.allowedSecretNames.length > 0 ||
         workload.migrationSecretNames.length > 0) &&

@@ -81,11 +81,14 @@ param activeRevisionsMode string = 'Single'
 @description('Termination grace period seconds.')
 param terminationGracePeriodSeconds int = 30
 
-@description('Optional custom hostname. Empty skips custom domain binding.')
+@description('Optional primary custom hostname. Empty skips custom domain binding. Exposed as AZURE_CUSTOM_DOMAIN.')
 param customDomainName string = ''
 
-@description('Existing managed certificate resource ID for the custom hostname. Required when customDomainName is set.')
+@description('Existing managed certificate resource ID for the primary custom hostname. Required when customDomainName is set.')
 param customDomainCertificateId string = ''
+
+@description('Additional sticky hostname bindings as objects with name and certificateId. Re-asserted every deploy.')
+param additionalCustomDomains array = []
 
 var hasUserAssigned = length(userAssignedIdentityIds) > 0
 var hasSystemAssigned = enableSystemAssignedIdentity
@@ -160,7 +163,7 @@ var azureCustomDomainEnv = hasCustomDomain
 
 var containerEnv = concat(envVars, secretEnvironment, azureCustomDomainEnv)
 
-var customDomains = hasCustomDomain
+var primaryCustomDomains = hasCustomDomain
   ? [
       {
         name: customDomainName
@@ -170,6 +173,17 @@ var customDomains = hasCustomDomain
     ]
   : []
 
+var extraCustomDomains = [
+  for domain in additionalCustomDomains: {
+    name: domain.name
+    bindingType: 'SniEnabled'
+    certificateId: domain.certificateId
+  }
+]
+
+var customDomains = concat(primaryCustomDomains, extraCustomDomains)
+var hasAnyCustomDomain = length(customDomains) > 0
+
 var ingress = union(
   {
     external: externalIngress
@@ -177,7 +191,7 @@ var ingress = union(
     targetPort: targetPort
     transport: transport
   },
-  hasCustomDomain
+  hasAnyCustomDomain
     ? {
         customDomains: customDomains
       }
