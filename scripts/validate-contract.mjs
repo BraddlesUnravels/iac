@@ -28,9 +28,12 @@ const productionStackPolicies = {
       HOST: '0.0.0.0',
     },
     requireEmptySecretRefs: true,
-    requireCustomDomainDisabled: true,
+    // Hostname is catalog-owned and injected as AZURE_CUSTOM_DOMAIN by the stack.
+    requireCustomDomainDisabled: false,
   },
 };
+
+const reservedInfrastructureEnvNames = new Set(['AZURE_CUSTOM_DOMAIN']);
 
 const formatAjvErrors = (errors = []) =>
   errors.map(({ instancePath, message, params }) => {
@@ -175,6 +178,22 @@ export const validateContract = async (
     errors.push(
       `Secret references must exactly match: ${[...approvedSecretNames].sort().join(', ')}`,
     );
+  }
+
+  for (const name of Object.keys(contract.env)) {
+    if (reservedInfrastructureEnvNames.has(name)) {
+      errors.push(
+        `${name} is infrastructure-owned and must not appear in the workload contract`,
+      );
+    }
+  }
+
+  for (const name of Object.keys(contract.secretRefs)) {
+    if (reservedInfrastructureEnvNames.has(name)) {
+      errors.push(
+        `${name} is infrastructure-owned and must not appear in secretRefs`,
+      );
+    }
   }
 
   const allEnvironmentNames = [

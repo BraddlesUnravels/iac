@@ -20,6 +20,6 @@
   },
   "secretRefs": {},
   "customDomain": {
-    "enabled": false
+    "enabled": true
   }
 }

@@ -238,7 +238,7 @@ run_apply() {
 }
 
 run_verify() {
-  local app_json fqdn configured_image url
+  local app_json fqdn configured_image url custom_domain certificate_id bound_domain bound_cert azure_custom_domain
   app_json="$(az containerapp show \
     --name "${container_app_name}" \
     --resource-group "${resource_group}" \
@@ -252,8 +252,47 @@ run_verify() {
     exit 1
   fi
 
+  custom_domain="$(jq -er --arg app "${APPLICATION}" '.workloads[$app].customDomainName // empty' "${CATALOG_FILE}")"
+  certificate_id="$(jq -er --arg app "${APPLICATION}" '.workloads[$app].certificateResourceId // empty' "${CATALOG_FILE}")"
   fqdn="$(jq -er '.properties.configuration.ingress.fqdn' <<<"${app_json}")"
-  url="https://${fqdn}"
+
+  if [[ -n "${custom_domain}" ]]; then
+    bound_domain="$(jq -er --arg host "${custom_domain}" '
+      (.properties.configuration.ingress.customDomains // [])
+      | map(select(.name == $host and .bindingType == "SniEnabled"))
+      | .[0].name // empty
+    ' <<<"${app_json}")"
+    bound_cert="$(jq -er --arg host "${custom_domain}" '
+      (.properties.configuration.ingress.customDomains // [])
+      | map(select(.name == $host and .bindingType == "SniEnabled"))
+      | .[0].certificateId // empty
+    ' <<<"${app_json}")"
+
+    if [[ "${bound_domain}" != "${custom_domain}" ]]; then
+      echo "Sticky custom domain binding missing for ${custom_domain}" >&2
+      exit 1
+    fi
+
+    if [[ -n "${certificate_id}" && "${bound_cert}" != "${certificate_id}" ]]; then
+      echo "Sticky certificate binding mismatch for ${custom_domain}" >&2
+      exit 1
+    fi
+
+    azure_custom_domain="$(jq -er '
+      (.properties.template.containers[0].env // [])
+      | map(select(.name == "AZURE_CUSTOM_DOMAIN"))
+      | .[0].value // empty
+    ' <<<"${app_json}")"
+
+    if [[ "${azure_custom_domain}" != "${custom_domain}" ]]; then
+      echo "AZURE_CUSTOM_DOMAIN must equal ${custom_domain}" >&2
+      exit 1
+    fi
+
+    url="https://${custom_domain}"
+  else
+    url="https://${fqdn}"
+  fi
 
   ready=0
   for _ in $(seq 1 30); do
@@ -277,7 +316,8 @@ run_verify() {
     exit 1
   fi
 
-  study_code="$(curl -sS -o /tmp/qwik-live-study -w '%{http_code}' "${url}/work/access-control-demo")"
+  # Qwik City case-study routes are trailing-slash canonical.
+  study_code="$(curl -sS -o /tmp/qwik-live-study -w '%{http_code}' "${url}/work/access-control-demo/")"
   if [[ "${study_code}" != '200' ]]; then
     echo "Case study expected 200, got ${study_code}" >&2
     exit 1
@@ -286,6 +326,10 @@ run_verify() {
   printf 'url=%s\n' "${url}"
   printf 'image=%s\n' "${configured_image}"
   printf 'health=ok\n'
+  if [[ -n "${custom_domain}" ]]; then
+    printf 'customDomain=%s\n' "${custom_domain}"
+    printf 'azureCustomDomain=%s\n' "${azure_custom_domain}"
+  fi
 }
 
 case "${OPERATION}" in

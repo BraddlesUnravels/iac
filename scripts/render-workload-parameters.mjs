@@ -17,10 +17,18 @@ export const renderWorkloadParameters = ({
 }) => {
   const workload = catalog.workloads[contract.application];
 
+  const customDomainEnabled = contract.customDomain.enabled === true;
+  const customDomainName = customDomainEnabled
+    ? workload.customDomainName
+    : '';
+  const customDomainCertificateId = customDomainEnabled
+    ? workload.certificateResourceId
+    : '';
+
   return {
     $schema:
       'https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#',
-    contentVersion: '1.0.0.0',
+    contentVersion: '*******',
     parameters: {
       location: { value: catalog.azure.location },
       containerAppName: { value: workload.containerAppName },
@@ -46,6 +54,8 @@ export const renderWorkloadParameters = ({
       },
       application: { value: contract.application },
       environment: { value: contract.environment },
+      customDomainName: { value: customDomainName ?? '' },
+      customDomainCertificateId: { value: customDomainCertificateId ?? '' },
     },
     metadata: {
       sourceCommitSha: evidence.sourceCommitSha,

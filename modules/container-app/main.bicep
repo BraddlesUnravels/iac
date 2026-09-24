@@ -81,6 +81,12 @@ param activeRevisionsMode string = 'Single'
 @description('Termination grace period seconds.')
 param terminationGracePeriodSeconds int = 30
 
+@description('Optional custom hostname. Empty skips custom domain binding.')
+param customDomainName string = ''
+
+@description('Existing managed certificate resource ID for the custom hostname. Required when customDomainName is set.')
+param customDomainCertificateId string = ''
+
 var hasUserAssigned = length(userAssignedIdentityIds) > 0
 var hasSystemAssigned = enableSystemAssignedIdentity
 
@@ -138,7 +144,45 @@ var secretEnvironment = [
   }
 ]
 
-var containerEnv = concat(envVars, secretEnvironment)
+// Sticky custom-domain binding: when configured, every deploy re-asserts SNI binding
+// to the existing managed certificate so image revisions cannot wipe hostname TLS.
+var hasCustomDomain = !empty(customDomainName)
+
+// Cross-app standard: custom hostname is always exposed as AZURE_CUSTOM_DOMAIN.
+var azureCustomDomainEnv = hasCustomDomain
+  ? [
+      {
+        name: 'AZURE_CUSTOM_DOMAIN'
+        value: customDomainName
+      }
+    ]
+  : []
+
+var containerEnv = concat(envVars, secretEnvironment, azureCustomDomainEnv)
+
+var customDomains = hasCustomDomain
+  ? [
+      {
+        name: customDomainName
+        bindingType: 'SniEnabled'
+        certificateId: customDomainCertificateId
+      }
+    ]
+  : []
+
+var ingress = union(
+  {
+    external: externalIngress
+    allowInsecure: allowInsecure
+    targetPort: targetPort
+    transport: transport
+  },
+  hasCustomDomain
+    ? {
+        customDomains: customDomains
+      }
+    : {}
+)
 
 var probes = empty(healthProbePath)
   ? []
@@ -193,12 +237,7 @@ resource containerApp 'Microsoft.App/containerApps@2025-01-01' = {
       maxInactiveRevisions: 1
       secrets: secretDefinitions
       registries: registries
-      ingress: {
-        external: externalIngress
-        allowInsecure: allowInsecure
-        targetPort: targetPort
-        transport: transport
-      }
+      ingress: ingress
     }
     template: {
       terminationGracePeriodSeconds: terminationGracePeriodSeconds
@@ -225,5 +264,8 @@ resource containerApp 'Microsoft.App/containerApps@2025-01-01' = {
 output id string = containerApp.id
 output name string = containerApp.name
 output fqdn string = containerApp.properties.configuration.ingress.fqdn
-output url string = 'https://${containerApp.properties.configuration.ingress.fqdn}'
+output url string = hasCustomDomain
+  ? 'https://${customDomainName}'
+  : 'https://${containerApp.properties.configuration.ingress.fqdn}'
+output customDomainName string = customDomainName
 output principalId string = enableSystemAssignedIdentity ? containerApp.identity.principalId : ''
