@@ -38,7 +38,7 @@ require_command jq
 require_command node
 require_command curl
 
-node "${ROOT_DIR}/scripts/validate-environment.mjs" "${CATALOG_FILE}"
+node "${ROOT_DIR}/scripts/validate-environment.mjs" "${CATALOG_FILE}" >&2
 
 registry_name="$(jq -er '.azure.containerRegistryName' "${CATALOG_FILE}")"
 login_server="$(jq -er '.azure.containerRegistryLoginServer' "${CATALOG_FILE}")"

@@ -56,6 +56,7 @@ jobs:
           node --test
           tests/contract-validator.test.mjs
           tests/image-validator.test.mjs
+          tests/acr-image-resolver.test.mjs
           tests/release-verifier.test.mjs
           tests/workload-what-if-validator.test.mjs
           tests/platform-what-if-validator.test.mjs
