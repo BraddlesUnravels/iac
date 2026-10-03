@@ -196,3 +196,33 @@ test('rejects qwik injected environment variables', async () => {
   assert.equal(result.valid, false);
   assert.match(result.errors.join('\n'), /Environment variables must exactly match/);
 });
+
+test('rejects qwik secret refs outside the catalog allowlist', async () => {
+  const contract = await readFixture('workload.qwik-valid.json');
+  contract.secretRefs = { ACA_GENERAL_ACCESS_CODE: 'some-other-secret' };
+
+  const result = await validateContract(contract, qwikCatalog, qwikCaller);
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /Secret references must exactly match/);
+});
+
+test('rejects unapproved qwik secret environment variable names', async () => {
+  const contract = await readFixture('workload.qwik-valid.json');
+  contract.secretRefs = { ORIGIN: 'qwik-demo-general-access-code' };
+
+  const result = await validateContract(contract, qwikCatalog, qwikCaller);
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /Secret environment variable ORIGIN is not approved/);
+});
+
+test('rejects qwik contract missing a required environment variable', async () => {
+  const contract = await readFixture('workload.qwik-valid.json');
+  delete contract.env.HOST;
+
+  const result = await validateContract(contract, qwikCatalog, qwikCaller);
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /Environment variables must exactly match/);
+});

@@ -7,6 +7,7 @@ import { loadAndValidateEnvironment } from './validate-environment.mjs';
 
 const allowedChangeTypes = new Set(['Create', 'Modify', 'NoChange']);
 const normalizeResourceId = (resourceId) => resourceId.toLowerCase();
+const secretsDeltaPath = 'properties.configuration.secrets';
 
 const forbiddenDeltaPaths = [
   'identity',
@@ -15,11 +16,11 @@ const forbiddenDeltaPaths = [
   'properties.configuration.ingress.external',
   'properties.configuration.ingress.allowInsecure',
   'properties.configuration.ingress.targetPort',
-  'properties.configuration.secrets',
+  secretsDeltaPath,
   'properties.configuration.activeRevisionsMode',
 ];
 
-const inspectModifyDelta = (change, errors) => {
+const inspectModifyDelta = (change, errors, { allowSecretChanges = false } = {}) => {
   const delta = change.delta ?? change.propertyChanges ?? [];
 
   if (!Array.isArray(delta) || delta.length === 0) {
@@ -33,6 +34,11 @@ const inspectModifyDelta = (change, errors) => {
   for (const entry of delta) {
     const path = String(entry.path ?? entry.propertyName ?? '').toLowerCase();
     for (const forbidden of forbiddenDeltaPaths) {
+      // Catalog-approved Key Vault secret references may change; values never appear in what-if.
+      if (allowSecretChanges && forbidden === secretsDeltaPath) {
+        continue;
+      }
+
       if (path.includes(forbidden.toLowerCase())) {
         errors.push(
           `Forbidden configuration change on ${change.resourceId}: ${path || forbidden}`,
@@ -132,7 +138,9 @@ export const validateWorkloadWhatIf = ({
     }
 
     if (changeType === 'Modify') {
-      inspectModifyDelta(change, errors);
+      inspectModifyDelta(change, errors, {
+        allowSecretChanges: (workload.allowedSecretNames ?? []).length > 0,
+      });
     }
 
     normalizedChanges.push({

@@ -53,6 +53,9 @@ param envVars array = []
 @secure()
 param secrets object = {}
 
+@description('Key Vault-referenced secrets: [{ name, keyVaultUrl, identityResourceId }]. Values are resolved by Container Apps at runtime.')
+param keyVaultSecretRefs array = []
+
 @description('Environment variables bound to secrets: name + secretRef.')
 param secretEnvVars array = []
 
@@ -133,12 +136,22 @@ var registries = !empty(registryLoginServer)
 
 var secretNames = items(secrets)
 
-var secretDefinitions = [
+var inlineSecretDefinitions = [
   for secret in secretNames: {
     name: secret.key
     value: secret.value
   }
 ]
+
+var keyVaultSecretDefinitions = [
+  for secretRef in keyVaultSecretRefs: {
+    name: secretRef.name
+    keyVaultUrl: secretRef.keyVaultUrl
+    identity: secretRef.identityResourceId
+  }
+]
+
+var secretDefinitions = concat(inlineSecretDefinitions, keyVaultSecretDefinitions)
 
 var secretEnvironment = [
   for secretEnv in secretEnvVars: {

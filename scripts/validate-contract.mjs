@@ -27,7 +27,11 @@ const productionStackPolicies = {
       PORT: '3000',
       HOST: '0.0.0.0',
     },
-    requireEmptySecretRefs: true,
+    requireEmptySecretRefs: false,
+    // Optional app-specific variables; any other name is rejected.
+    optionalEnvironmentNames: ['ACA_DEMO_DOMAIN', 'ACA_DEMO_ACCESS_LINK'],
+    // Secret-backed env names; secret names themselves come from the catalog allowlist.
+    allowedSecretEnvironmentNames: ['ACA_GENERAL_ACCESS_CODE'],
     // Hostname is catalog-owned and injected as AZURE_CUSTOM_DOMAIN by the stack.
     requireCustomDomainDisabled: false,
   },
@@ -147,10 +151,21 @@ export const validateContract = async (
   if (contract.environment === 'production' && policy) {
     const requestedNames = new Set(Object.keys(contract.env));
     const approvedNames = new Set(Object.keys(policy.environment));
+    const optionalNames = new Set(policy.optionalEnvironmentNames ?? []);
+    const requiredNamesPresent = [...approvedNames].every((name) =>
+      requestedNames.has(name),
+    );
+    const unexpectedNames = [...requestedNames].filter(
+      (name) => !approvedNames.has(name) && !optionalNames.has(name),
+    );
 
-    if (!setsEqual(requestedNames, approvedNames)) {
+    if (!requiredNamesPresent || unexpectedNames.length > 0) {
+      const optionalSuffix =
+        optionalNames.size > 0
+          ? ` (optional: ${[...optionalNames].sort().join(', ')})`
+          : '';
       errors.push(
-        `Environment variables must exactly match: ${[...approvedNames].sort().join(', ')}`,
+        `Environment variables must exactly match: ${[...approvedNames].sort().join(', ')}${optionalSuffix}`,
       );
     }
 
@@ -163,6 +178,16 @@ export const validateContract = async (
     if (policy.requireEmptySecretRefs) {
       if (Object.keys(contract.secretRefs).length > 0) {
         errors.push('Secret references must be empty for this stack');
+      }
+    } else if (policy.allowedSecretEnvironmentNames) {
+      const allowedSecretEnvNames = new Set(policy.allowedSecretEnvironmentNames);
+
+      for (const name of Object.keys(contract.secretRefs)) {
+        if (!allowedSecretEnvNames.has(name)) {
+          errors.push(
+            `Secret environment variable ${name} is not approved for this stack`,
+          );
+        }
       }
     }
 

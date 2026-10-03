@@ -18,7 +18,9 @@
     "HOST": "0.0.0.0",
     "ORIGIN": "https://evil.example"
   },
-  "secretRefs": {},
+  "secretRefs": {
+    "ACA_GENERAL_ACCESS_CODE": "qwik-demo-general-access-code"
+  },
   "customDomain": {
     "enabled": true
   }

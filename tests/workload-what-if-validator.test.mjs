@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import { loadAndValidateWorkloadWhatIf } from '../scripts/validate-workload-what-if.mjs';
+import {
+  loadAndValidateWorkloadWhatIf,
+  validateWorkloadWhatIf,
+} from '../scripts/validate-workload-what-if.mjs';
 
 const catalogPath = new URL('./fixtures/environment.with-qwik.json', import.meta.url);
 const fixturePath = (name) => new URL(`./fixtures/${name}`, import.meta.url);
@@ -39,4 +43,26 @@ test('rejects unrelated registry changes', async () => {
   const result = await validateFixture('what-if.qwik-unrelated.json');
   assert.equal(result.valid, false);
   assert.match(result.errors.join('\n'), /unapproved resource/);
+});
+
+test('accepts Key Vault secret reference changes for workloads with approved secrets', async () => {
+  const result = await validateFixture('what-if.qwik-secrets-modify.json');
+  assert.equal(result.valid, true, result.errors.join('\n'));
+});
+
+test('rejects secret changes for workloads without approved secrets', async () => {
+  const catalog = JSON.parse(await readFile(catalogPath, 'utf8'));
+  catalog.workloads['qwik-website'].allowedSecretNames = [];
+  const whatIfResult = JSON.parse(
+    await readFile(fixturePath('what-if.qwik-secrets-modify.json'), 'utf8'),
+  );
+
+  const result = validateWorkloadWhatIf({
+    whatIfResult,
+    catalog,
+    application: 'qwik-website',
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /properties\.configuration\.secrets/);
 });

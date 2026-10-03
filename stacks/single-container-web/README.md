@@ -28,6 +28,7 @@ foundation are added (next migration).
 - Optional primary + additional sticky custom domain bindings (`SniEnabled`)
 - User-assigned runtime identity for registry pull
 - Non-secret env from the workload contract
+- Secret env from Key Vault references (`secretRefs`), resolved at runtime by the runtime identity
 - `AZURE_CUSTOM_DOMAIN` injected for the catalog primary hostname when domains are enabled
 
 No database, Key Vault, or ACR control-plane resources are created here.
@@ -63,5 +64,11 @@ Operator runbook:
 - Prefer digest deployment after registry resolution; never deploy `latest`.
 - Custom domain hostnames live in the catalog; the contract only sets
   `customDomain.enabled`.
-- Secret references are supported by the broader design for future workloads;
-  Qwik currently uses an empty `secretRefs` map.
+- Secret references (`secretRefs`) map env var names to Key Vault secret names. The
+  secret names must exactly match the catalog `allowedSecretNames`, and the env var
+  names must be on the stack's approved secret env list in `scripts/validate-contract.mjs`.
+  The stack only stores a Key Vault reference on the Container App. The secret value
+  never passes through GitHub or the rendered parameters.
+- Before deploying, the secret must exist in the catalog `keyVaultName`, and the runtime
+  identity must hold `Key Vault Secrets User` on it. If either is missing, the revision
+  fails to provision.

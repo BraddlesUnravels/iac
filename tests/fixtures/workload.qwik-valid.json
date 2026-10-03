@@ -15,9 +15,13 @@
   "env": {
     "NODE_ENV": "production",
     "PORT": "3000",
-    "HOST": "0.0.0.0"
+    "HOST": "0.0.0.0",
+    "ACA_DEMO_DOMAIN": "https://aca.braddlesunravels.online",
+    "ACA_DEMO_ACCESS_LINK": "{{ACA_DEMO_DOMAIN}}/?code={{ACA_GENERAL_ACCESS_CODE}}"
   },
-  "secretRefs": {},
+  "secretRefs": {
+    "ACA_GENERAL_ACCESS_CODE": "qwik-demo-general-access-code"
+  },
   "customDomain": {
     "enabled": true
   }

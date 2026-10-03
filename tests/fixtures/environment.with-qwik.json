@@ -74,7 +74,7 @@
       "containerAppsEnvironmentName": "acae-qwik-website-production",
       "containerAppName": "aca-qwik-website-production",
       "logAnalyticsWorkspaceName": "log-qwik-website-production",
-      "keyVaultName": null,
+      "keyVaultName": "kv-acd-prod-braddles",
       "runtimeIdentityName": "id-qwik-website-pull",
       "publisherIdentityName": "id-qwik-website-publisher",
       "plannerIdentityName": "id-qwik-website-planner",
@@ -87,7 +87,7 @@
           "certificateResourceId": "/subscriptions/eb1b0038-3a72-459d-884c-ba2820dc53cc/resourceGroups/rg-qwik-website-production/providers/Microsoft.App/managedEnvironments/acae-qwik-website-production/managedCertificates/mc-qwik-apex-braddlesunravels-online"
         }
       ],
-      "allowedSecretNames": [],
+      "allowedSecretNames": ["qwik-demo-general-access-code"],
       "migrationSecretNames": [],
       "externalEnvironmentVariables": [],
       "bounds": {
