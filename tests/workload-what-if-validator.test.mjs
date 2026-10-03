@@ -66,3 +66,69 @@ test('rejects secret changes for workloads without approved secrets', async () =
   assert.equal(result.valid, false);
   assert.match(result.errors.join('\n'), /properties\.configuration\.secrets/);
 });
+
+test('accepts live CLI Ignore entries for untouched workload foundation resources', async () => {
+  const catalog = JSON.parse(await readFile(catalogPath, 'utf8'));
+  const prefix = `/subscriptions/${catalog.azure.subscriptionId}/resourceGroups/${catalog.workloads['qwik-website'].resourceGroup}/providers/`;
+  const foundationIds = [
+    `${prefix}Microsoft.App/managedEnvironments/acae-qwik-website-production`,
+    `${prefix}Microsoft.App/managedEnvironments/acae-qwik-website-production/managedCertificates/www`,
+    `${prefix}Microsoft.ManagedIdentity/userAssignedIdentities/id-qwik-website-pull`,
+    `${prefix}Microsoft.OperationalInsights/workspaces/log-qwik-website-production`,
+  ];
+  const result = validateWorkloadWhatIf({
+    catalog,
+    application: 'qwik-website',
+    whatIfResult: {
+      status: 'Succeeded',
+      changes: foundationIds.map((resourceId) => ({ resourceId, changeType: 'Ignore' })),
+    },
+  });
+  assert.equal(result.valid, true, result.errors.join('\n'));
+  assert.deepEqual(result.changes, []);
+
+  for (const changeType of ['Create', 'Modify', 'Delete', 'NoChange', 'Unsupported']) {
+    const rejected = validateWorkloadWhatIf({
+      catalog,
+      application: 'qwik-website',
+      whatIfResult: { status: 'Succeeded', changes: [{ resourceId: foundationIds[0], changeType }] },
+    });
+    assert.equal(rejected.valid, false, `Foundation ${changeType} must remain blocked`);
+  }
+});
+
+test('Ignore never permits a skipped app or a different workload scope', async () => {
+  const catalog = JSON.parse(await readFile(catalogPath, 'utf8'));
+  const workload = catalog.workloads['qwik-website'];
+  for (const [group, type] of [
+    [workload.resourceGroup, `Microsoft.App/containerApps/${workload.containerAppName}`],
+    [`${workload.resourceGroup}-other`, 'Microsoft.ManagedIdentity/userAssignedIdentities/pull'],
+    ['rg-access-control-demo', 'Microsoft.App/containerApps/aca-access-control-demo'],
+  ]) {
+    const result = validateWorkloadWhatIf({
+      catalog,
+      application: 'qwik-website',
+      whatIfResult: {
+        status: 'Succeeded',
+        changes: [{
+          resourceId: `/subscriptions/${catalog.azure.subscriptionId}/resourceGroups/${group}/providers/${type}`,
+          changeType: 'Ignore',
+        }],
+      },
+    });
+    assert.equal(result.valid, false);
+  }
+});
+
+test('nested deployments must use the exact workload resource group boundary', async () => {
+  const catalog = JSON.parse(await readFile(catalogPath, 'utf8'));
+  const workload = catalog.workloads['qwik-website'];
+  const resourceId = `/subscriptions/${catalog.azure.subscriptionId}/resourceGroups/${workload.resourceGroup}-other/providers/Microsoft.Resources/deployments/nested`;
+  const result = validateWorkloadWhatIf({
+    catalog,
+    application: 'qwik-website',
+    whatIfResult: { status: 'Succeeded', changes: [{ resourceId, changeType: 'Create' }] },
+  });
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /unapproved resource/);
+});

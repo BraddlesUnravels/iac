@@ -114,13 +114,51 @@ Planning uses `ProviderNoRbac` to retain full provider validation while checking
 read permissions rather than deployment write permissions. The protected apply
 path retains the default `Provider` validation.
 
-A privileged foundation operator must review the foundation what-if and re-apply
-using the bootstrap parameters above (`az deployment sub create` with the same
-location, template and parameters). Confirm the planner has Reader and the custom
+A merged Bicep change does not update live Azure RBAC. Release preflight now reads
+the authenticated identity's effective RG permissions and rejects missing
+deployment actions before image resolution or what-if. It does not grant IAM
+permissions. The protected apply path also checks deployment and Container App
+write permissions; provider validation still checks linked resources.
+
+A privileged foundation operator can repair **only** the missing planner role
+and assignment without re-applying environments, identities, OIDC credentials or
+registry permissions:
+
+```bash
+PLANNER_PRINCIPAL_ID=$(az identity show \
+  --resource-group rg-qwik-website-production \
+  --name id-qwik-website-planner --query principalId --output tsv)
+
+az deployment group what-if \
+  --resource-group rg-qwik-website-production \
+  --template-file modules/role-assignment/deployment-planner.bicep \
+  --parameters plannerPrincipalId="$PLANNER_PRINCIPAL_ID"
+
+# Proceed only if the preview contains the intended role and assignment.
+az deployment group create \
+  --resource-group rg-qwik-website-production \
+  --template-file modules/role-assignment/deployment-planner.bicep \
+  --parameters plannerPrincipalId="$PLANNER_PRINCIPAL_ID" \
+  --mode Incremental
+```
+
+The full foundation reuses this module with the original deterministic role and
+assignment IDs. Confirm the planner has Reader and the custom
 deployment planner role on `rg-qwik-website-production`, allow RBAC propagation,
 then trigger a fresh release dispatch after the fix is merged. Re-running an old
 workflow uses its original commit. Do not grant Contributor to the planner or
 attempt IAM changes from the release workflow.
+
+Before applying the release, also confirm deployer Contributor and pull-identity
+Managed Identity Operator, ACR control-plane and repository Readers, the enabled
+`qwik-demo-general-access-code` secret and the pull identity's secret-scoped
+Key Vault Secrets User assignment, and both managed certificate bindings.
+Planner repair deliberately does not change these downstream prerequisites.
+
+Incremental workload what-if responses include `Ignore` entries for foundation
+resources absent from the release template. The workload gate accepts those
+entries only inside the exact workload RG; it still rejects changes to foundation
+resources, foreign scopes, and `Ignore` on the Container App itself.
 
 ## Runtime secrets (demo access link)
 

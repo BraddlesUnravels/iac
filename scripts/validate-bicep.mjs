@@ -9,6 +9,7 @@ const entryPoints = [
   'stacks/qwik-elysia-postgres/main.bicep',
   'stacks/single-container-web/main.bicep',
   'foundations/single-container-web/main.bicep',
+  'modules/role-assignment/deployment-planner.bicep',
 ];
 
 const diagnosticPattern =
@@ -102,12 +103,8 @@ const assertPlatformTemplate = (template) => {
   }
 };
 
-const assertFoundationPlannerRole = (template) => {
-  const workloadTemplate = template.resources.find(
-    (resource) => resource.name === 'workload-roles',
-  ).properties.template;
-  const workloadRoles = workloadTemplate.resources;
-  const plannerRole = workloadRoles.find(
+const assertPlannerRole = (template) => {
+  const plannerRole = template.resources.find(
     (resource) => resource.type === 'Microsoft.Authorization/roleDefinitions',
   );
 
@@ -125,26 +122,49 @@ const assertFoundationPlannerRole = (template) => {
     notDataActions: [],
   }], 'Planner role must allow planning only, with no write or data-plane permissions');
 
-  const plannerAssignments = workloadRoles.filter(
+  const plannerAssignments = template.resources.filter(
     (resource) => resource.type === 'Microsoft.Authorization/roleAssignments'
       && resource.properties.principalId === "[parameters('plannerPrincipalId')]",
   );
-  assert.equal(plannerAssignments.length, 2, 'Planner must receive Reader and what-if roles only');
-  assert.equal(
-    workloadTemplate.variables.readerRoleId,
-    "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'acdd72a7-3385-48ef-bd42-f606fba81ae7')]",
-  );
-  assert.ok(plannerAssignments.some(
-    (resource) => resource.properties.roleDefinitionId === "[variables('readerRoleId')]",
-  ), 'Planner must retain Reader');
+  assert.equal(template.resources.length, 2, 'Planner repair must contain only a role and assignment');
+  assert.equal(plannerAssignments.length, 1);
   const plannerRoleId = "[resourceId('Microsoft.Authorization/roleDefinitions', guid(resourceGroup().id, 'qwik-planner-what-if'))]";
   assert.equal(plannerRole.name, "[guid(resourceGroup().id, 'qwik-planner-what-if')]");
+  assert.equal(
+    plannerAssignments[0].name,
+    "[guid(resourceGroup().id, parameters('plannerPrincipalId'), resourceId('Microsoft.Authorization/roleDefinitions', guid(resourceGroup().id, 'qwik-planner-what-if')), 'qwik-planner-what-if')]",
+    'Planner assignment ID must remain compatible with existing foundation deployments',
+  );
   assert.ok(plannerAssignments.some(
-    (resource) => resource.properties.roleDefinitionId === plannerRoleId
+    (resource) => resource.properties.roleDefinitionId === "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', guid(resourceGroup().id, 'qwik-planner-what-if'))]"
       && resource.dependsOn?.includes(plannerRoleId)
       && resource.properties.principalType === 'ServicePrincipal'
       && resource.scope === undefined,
   ), 'Planner what-if role must be assigned at the workload resource group');
+};
+
+const assertFoundationPlannerRole = (template) => {
+  const workloadTemplate = template.resources.find(
+    (resource) => resource.name === 'workload-roles',
+  ).properties.template;
+  const plannerAssignments = workloadTemplate.resources.filter(
+    (resource) => resource.type === 'Microsoft.Authorization/roleAssignments'
+      && resource.properties.principalId === "[parameters('plannerPrincipalId')]",
+  );
+  assert.equal(plannerAssignments.length, 1, 'Planner must retain its Reader assignment');
+  assert.equal(plannerAssignments[0].properties.roleDefinitionId, "[variables('readerRoleId')]");
+  assert.equal(
+    workloadTemplate.variables.readerRoleId,
+    "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'acdd72a7-3385-48ef-bd42-f606fba81ae7')]",
+  );
+  const plannerModule = workloadTemplate.resources.find(
+    (resource) => resource.name === 'planner-what-if-role',
+  );
+  assert.equal(
+    plannerModule.properties.parameters.plannerPrincipalId.value,
+    "[parameters('plannerPrincipalId')]",
+  );
+  assertPlannerRole(plannerModule.properties.template);
 };
 
 for (const entryPoint of entryPoints) {
@@ -170,6 +190,10 @@ for (const entryPoint of entryPoints) {
 
   if (entryPoint === 'foundations/single-container-web/main.bicep') {
     assertFoundationPlannerRole(JSON.parse(result.stdout));
+  }
+
+  if (entryPoint === 'modules/role-assignment/deployment-planner.bicep') {
+    assertPlannerRole(JSON.parse(result.stdout));
   }
 
   console.log(`Validated Bicep entry point: ${entryPoint}`);
