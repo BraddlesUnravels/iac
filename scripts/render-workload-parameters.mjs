@@ -31,6 +31,17 @@ export const renderWorkloadParameters = ({
       }))
     : [];
 
+  const secretRefEntries = Object.entries(contract.secretRefs ?? {});
+  const secretNames = [...new Set(secretRefEntries.map(([, name]) => name))];
+  const keyVaultSecretRefs = secretNames.map((name) => ({
+    name,
+    keyVaultUrl: `https://${workload.keyVaultName}.vault.azure.net/secrets/${name}`,
+  }));
+  const secretEnvVars = secretRefEntries.map(([name, secretRef]) => ({
+    name,
+    secretRef,
+  }));
+
   return {
     $schema:
       'https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#',
@@ -58,6 +69,8 @@ export const renderWorkloadParameters = ({
           value,
         })),
       },
+      keyVaultSecretRefs: { value: keyVaultSecretRefs },
+      secretEnvVars: { value: secretEnvVars },
       application: { value: contract.application },
       environment: { value: contract.environment },
       customDomainName: { value: customDomainName ?? '' },

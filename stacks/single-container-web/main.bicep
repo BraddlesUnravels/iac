@@ -39,6 +39,12 @@ param maxReplicas int = 1
 @description('Approved non-secret environment variables as name/value objects.')
 param nonsecretEnvVars array
 
+@description('Catalog-approved Key Vault secret references: [{ name, keyVaultUrl }]. Resolved with the runtime identity.')
+param keyVaultSecretRefs array = []
+
+@description('Environment variables bound to Key Vault secrets: [{ name, secretRef }].')
+param secretEnvVars array = []
+
 @description('Application id for tags.')
 param application string = 'qwik-website'
 
@@ -98,7 +104,14 @@ module webApp '../../modules/container-app/main.bicep' = {
     registryIdentityId: runtimeIdentity.id
     envVars: nonsecretEnvVars
     secrets: {}
-    secretEnvVars: []
+    keyVaultSecretRefs: [
+      for secretRef in keyVaultSecretRefs: {
+        name: secretRef.name
+        keyVaultUrl: secretRef.keyVaultUrl
+        identityResourceId: runtimeIdentity.id
+      }
+    ]
+    secretEnvVars: secretEnvVars
     activeRevisionsMode: 'Single'
     customDomainName: customDomainName
     customDomainCertificateId: customDomainCertificateId

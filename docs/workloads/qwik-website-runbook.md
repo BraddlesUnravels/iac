@@ -104,6 +104,32 @@ az deployment sub what-if \
 11. Second release + same-release replay + confirm `access-control-demo` and unrelated
     ACR repositories remain unchanged.
 
+## Runtime secrets (demo access link)
+
+The qwik app's "Try the live demo" action reads these env vars:
+
+- `ACA_DEMO_DOMAIN` and `ACA_DEMO_ACCESS_LINK`: non-secret values set in the contract `env`.
+- `ACA_GENERAL_ACCESS_CODE`: a Key Vault reference to `qwik-demo-general-access-code` in
+  `kv-acd-prod-braddles`.
+
+Operator prerequisites (privileged; run these once before the first deploy that includes the secret):
+
+```bash
+# Store the value from a file so it never appears in shell history or logs.
+az keyvault secret set --vault-name kv-acd-prod-braddles \
+  --name qwik-demo-general-access-code --file ./code.txt --output none
+rm ./code.txt
+
+PRINCIPAL_ID=$(az identity show -g rg-qwik-website-production -n id-qwik-website-pull --query principalId -o tsv)
+VAULT_ID=$(az keyvault show -n kv-acd-prod-braddles --query id -o tsv)
+az role assignment create --role "Key Vault Secrets User" \
+  --assignee-object-id "$PRINCIPAL_ID" --assignee-principal-type ServicePrincipal \
+  --scope "$VAULT_ID/secrets/qwik-demo-general-access-code"
+```
+
+To rotate the code, set a new secret version. Running revisions keep the old value until
+they restart; restart the active revision or deploy a new release to pick it up.
+
 ## Custom domain and sticky managed certificate
 
 Live production hostnames:
