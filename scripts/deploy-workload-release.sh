@@ -181,6 +181,7 @@ run_what_if() {
     --resource-group "${resource_group}" \
     --template-file "${FIXED_STACK_TEMPLATE}" \
     --parameters "@${parameters_file}" \
+    --validation-level ProviderNoRbac \
     --no-pretty-print \
     --only-show-errors \
     --result-format FullResourcePayloads \

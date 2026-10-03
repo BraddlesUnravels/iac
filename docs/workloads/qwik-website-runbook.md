@@ -48,7 +48,7 @@ Shared ACR platform prerequisites: [../operations.md](../operations.md).
 | --- | --- | --- | --- |
 | Publisher UAMI | Qwik `image-publish` | ACR Repository Writer on `qwik-website` only (`2a1e307c-b015-4ebd-883e-5b7698a07328`) | App RG write, other repos |
 | Pull UAMI | Attached to ACA | ACR Repository Reader on `qwik-website` only (`b93aa761-3e63-49ed-ac28-beffa264f7ac`) | Writer, RG write |
-| Planner UAMI | IaC `production-plan` | RG Reader + what-if + ACR control-plane Reader + ACR repo Reader | RG write, roleAssignment/write |
+| Planner UAMI | IaC `production-plan` | RG Reader + custom deployment planner role (read, validate, what-if) + ACR control-plane Reader + ACR repo Reader | RG write, roleAssignment/write |
 | Deployer UAMI | IaC `production` | RG Contributor + MIO on pull identity + ACR control-plane Reader + ACR repo Reader | Platform RG write, roleAssignment/write |
 | Foundation operator | Manual bootstrap | RG create + IAM at intended scopes | Standing release runtime |
 | Dispatch GitHub App | Qwik dispatch step | `repository_dispatch` to IaC only | Long-lived PAT / Azure |
@@ -103,6 +103,24 @@ az deployment sub what-if \
 10. Publish first stable Qwik release; approve IaC `production` if required.
 11. Second release + same-release replay + confirm `access-control-demo` and unrelated
     ACR repositories remain unchanged.
+
+### Planner what-if authorization repair
+
+If the planner passes preflight but fails with `AuthorizationFailed` for
+`Microsoft.Resources/deployments/whatIf/action`, Reader alone is insufficient.
+The foundation now defines and assigns a custom deployment planner role, with
+read, validate and what-if actions only, scoped to the workload resource group.
+Planning uses `ProviderNoRbac` to retain full provider validation while checking
+read permissions rather than deployment write permissions. The protected apply
+path retains the default `Provider` validation.
+
+A privileged foundation operator must review the foundation what-if and re-apply
+using the bootstrap parameters above (`az deployment sub create` with the same
+location, template and parameters). Confirm the planner has Reader and the custom
+deployment planner role on `rg-qwik-website-production`, allow RBAC propagation,
+then trigger a fresh release dispatch after the fix is merged. Re-running an old
+workflow uses its original commit. Do not grant Contributor to the planner or
+attempt IAM changes from the release workflow.
 
 ## Runtime secrets (demo access link)
 
