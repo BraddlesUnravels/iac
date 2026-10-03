@@ -26,6 +26,11 @@ case "$*" in
   'group show '*) ;;
   'acr show '*) printf '%s\\n' "$MOCK_ACR" ;;
   'acr login '*) echo '{"accessToken":"test-refresh-token"}' ;;
+  'deployment group what-if '*)
+    printf '%s\\n' "$*" >> "$MOCK_AZ_LOG"
+    cat "$MOCK_WHAT_IF"
+    ;;
+  'deployment group create '*) printf '%s\\n' "$*" >> "$MOCK_AZ_LOG" ;;
   *) echo "Unexpected az command: $*" >&2; exit 1 ;;
 esac
 `, { mode: 0o700 });
@@ -62,6 +67,8 @@ fi
       MOCK_SUBSCRIPTION: catalog.azure.subscriptionId,
       MOCK_TENANT: catalog.azure.tenantId,
       MOCK_DIGEST: digest,
+      MOCK_AZ_LOG: join(directory, 'az.log'),
+      MOCK_WHAT_IF: join(root, 'tests/fixtures/what-if.qwik-nochange.json'),
       MOCK_ACR: JSON.stringify({
         name: catalog.azure.containerRegistryName,
         loginServer: catalog.azure.containerRegistryLoginServer,
@@ -108,3 +115,41 @@ for (const mismatch of [false, true]) {
     }
   });
 }
+
+for (const operation of ['what-if', 'apply']) {
+  test(`${operation} uses the appropriate RBAC validation level`, async (t) => {
+    const { env, evidencePath } = await setup(t);
+    const result = spawnSync('bash', [
+      join(root, 'scripts/deploy-workload-release.sh'),
+      operation, 'qwik-website', catalogPath, contractPath, evidencePath,
+    ], { env, encoding: 'utf8' });
+
+    assert.equal(result.status, 0, result.stderr);
+    const commands = await readFile(env.MOCK_AZ_LOG, 'utf8');
+    assert.match(commands, /deployment group what-if /);
+    if (operation === 'what-if') {
+      assert.match(commands, /--validation-level ProviderNoRbac/);
+      assert.doesNotMatch(commands, /deployment group create/);
+      assert.match(result.stdout, /No material workload changes/);
+    } else {
+      assert.doesNotMatch(commands, /--validation-level/);
+      assert.match(commands, /deployment group create /);
+      assert.match(result.stdout, /deploymentName=qwik-/);
+    }
+  });
+}
+
+test('read-only planner what-if still rejects unrelated resource changes', async (t) => {
+  const { env, evidencePath } = await setup(t);
+  env.MOCK_WHAT_IF = join(root, 'tests/fixtures/what-if.qwik-unrelated.json');
+  const result = spawnSync('bash', [
+    join(root, 'scripts/deploy-workload-release.sh'),
+    'what-if', 'qwik-website', catalogPath, contractPath, evidencePath,
+  ], { env, encoding: 'utf8' });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /unapproved resource/);
+  const commands = await readFile(env.MOCK_AZ_LOG, 'utf8');
+  assert.match(commands, /--validation-level ProviderNoRbac/);
+  assert.doesNotMatch(commands, /deployment group create/);
+});
