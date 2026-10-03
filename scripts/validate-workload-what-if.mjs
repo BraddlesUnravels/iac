@@ -87,6 +87,9 @@ export const validateWorkloadWhatIf = ({
     `/subscriptions/${catalog.azure.subscriptionId}` +
     `/resourceGroups/${workload.resourceGroup}` +
     `/providers/Microsoft.App/containerApps/${workload.containerAppName}`;
+  const workloadResourcePrefix = normalizeResourceId(
+    `/subscriptions/${catalog.azure.subscriptionId}/resourceGroups/${workload.resourceGroup}/providers/`,
+  );
 
   const allowedResources = new Map([
     [normalizeResourceId(containerAppId), 'Microsoft.App/containerApps'],
@@ -106,11 +109,16 @@ export const validateWorkloadWhatIf = ({
     const normalizedId = normalizeResourceId(resourceId);
     const expectedType = allowedResources.get(normalizedId);
 
+    // Incremental previews include resources outside the template as Ignore.
+    if (!expectedType && changeType === 'Ignore'
+      && normalizedId.startsWith(workloadResourcePrefix)) {
+      continue;
+    }
+
     // Nested deployments under the app RG deployment name pattern may appear.
     if (
       !expectedType &&
-      normalizedId.includes('/providers/microsoft.resources/deployments/') &&
-      normalizedId.includes(normalizeResourceId(workload.resourceGroup))
+      normalizedId.startsWith(`${workloadResourcePrefix}microsoft.resources/deployments/`)
     ) {
       // Only allow nested deployment IDs under the app RG; still not other RGs.
       if (!allowedChangeTypes.has(changeType) || changeType === 'Delete') {

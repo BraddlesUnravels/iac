@@ -32,6 +32,8 @@ bound by the release stack), or `access-control-demo` resources.
 
 - `main.bicep` — subscription scope; creates the resource group and nested deployment
 - `resources.bicep` — resource-group scope resources and role assignments
+- `../../modules/role-assignment/deployment-planner.bicep` — RG-scoped planner-only
+  RBAC repair; shared with the full foundation and preserves existing role IDs
 
 ## Operator usage
 

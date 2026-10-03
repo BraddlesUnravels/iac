@@ -92,6 +92,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
+if [[ "${OPERATION}" != 'verify' ]]; then
+  permissions_file="${temporary_directory}/deployment-permissions.json"
+  az rest --method get \
+    --url "https://management.azure.com/subscriptions/${subscription_id}/resourceGroups/${resource_group}/providers/Microsoft.Authorization/permissions?api-version=2022-04-01" \
+    --output json > "${permissions_file}"
+  node "${ROOT_DIR}/scripts/validate-deployment-permissions.mjs" \
+    "${permissions_file}" "${OPERATION}"
+fi
+
 resolve_and_render() {
   local operation_name="$1"
   local resolve_err_file="${temporary_directory}/resolve-acr.err"

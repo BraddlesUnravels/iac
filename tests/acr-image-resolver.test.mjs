@@ -24,6 +24,10 @@ case "$*" in
   'account show --query tenantId --output tsv') printf '%s\\n' "$MOCK_TENANT" ;;
   'bicep version') echo 'Bicep CLI version 0.47.16' ;;
   'group show '*) ;;
+  'rest --method get '*)
+    printf '%s\\n' "$*" >> "$MOCK_AZ_LOG"
+    printf '%s\\n' "$MOCK_PERMISSIONS"
+    ;;
   'acr show '*) printf '%s\\n' "$MOCK_ACR" ;;
   'acr login '*) echo '{"accessToken":"test-refresh-token"}' ;;
   'deployment group what-if '*)
@@ -66,6 +70,7 @@ fi
       PATH: `${directory}:${process.env.PATH}`,
       MOCK_SUBSCRIPTION: catalog.azure.subscriptionId,
       MOCK_TENANT: catalog.azure.tenantId,
+      MOCK_PERMISSIONS: JSON.stringify({ value: [{ actions: ['*'], notActions: [] }] }),
       MOCK_DIGEST: digest,
       MOCK_AZ_LOG: join(directory, 'az.log'),
       MOCK_WHAT_IF: join(root, 'tests/fixtures/what-if.qwik-nochange.json'),
@@ -153,3 +158,22 @@ test('read-only planner what-if still rejects unrelated resource changes', async
   assert.match(commands, /--validation-level ProviderNoRbac/);
   assert.doesNotMatch(commands, /deployment group create/);
 });
+
+for (const operation of ['preflight', 'what-if', 'apply']) {
+  test(`${operation} stops before what-if/apply when live deployment permissions are missing`, async (t) => {
+    const { env, evidencePath } = await setup(t);
+    env.MOCK_PERMISSIONS = JSON.stringify({ value: [{ actions: ['*/read'], notActions: [] }] });
+    const result = spawnSync('bash', [
+      join(root, 'scripts/deploy-workload-release.sh'),
+      operation, 'qwik-website', catalogPath, contractPath, evidencePath,
+    ], { env, encoding: 'utf8' });
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Deployment permission preflight failed/);
+    assert.match(result.stderr, /Microsoft.Resources\/deployments\/whatIf\/action/);
+    assert.doesNotMatch(result.stdout, /preflight=ok/);
+    const commands = await readFile(env.MOCK_AZ_LOG, 'utf8');
+    assert.ok(commands.includes(`/resourceGroups/${workload.resourceGroup}/providers/Microsoft.Authorization/permissions`));
+    assert.doesNotMatch(commands, /deployment group (what-if|create)/);
+  });
+}
