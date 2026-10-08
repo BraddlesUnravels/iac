@@ -49,6 +49,7 @@ resource deployerRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
           'Microsoft.App/containerApps/read'
           'Microsoft.App/containerApps/write'
           'Microsoft.App/managedEnvironments/read'
+          'Microsoft.App/managedEnvironments/join/action'
           'Microsoft.ManagedIdentity/userAssignedIdentities/read'
           'Microsoft.OperationalInsights/workspaces/read'
           'Microsoft.Authorization/roleAssignments/read'
