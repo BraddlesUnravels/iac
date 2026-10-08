@@ -1,6 +1,6 @@
 # Qwik website release-driven deployment runbook
 
-Last documentation pass: 2026-09-24.
+Last documentation pass: 2026-10-08.
 
 ## Status
 
@@ -49,7 +49,7 @@ Shared ACR platform prerequisites: [../operations.md](../operations.md).
 | Publisher UAMI | Qwik `image-publish` | ACR Repository Writer on `qwik-website` only (`2a1e307c-b015-4ebd-883e-5b7698a07328`) | App RG write, other repos |
 | Pull UAMI | Attached to ACA | ACR Repository Reader on `qwik-website` only (`b93aa761-3e63-49ed-ac28-beffa264f7ac`) | Writer, RG write |
 | Planner UAMI | IaC `production-plan` | RG Reader + custom deployment planner role (read, validate, what-if) + ACR control-plane Reader + ACR repo Reader | RG write, roleAssignment/write |
-| Deployer UAMI | IaC `production` | RG Contributor + MIO on pull identity + ACR control-plane Reader + ACR repo Reader | Platform RG write, roleAssignment/write |
+| Deployer UAMI | IaC `production` | Custom container-app deployer role + MIO on pull identity + ACR control-plane Reader + ACR repo Reader | RG Contributor, ACR/KV write, roleAssignment/write |
 | Foundation operator | Manual bootstrap | RG create + IAM at intended scopes | Standing release runtime |
 | Dispatch GitHub App | Qwik dispatch step | `repository_dispatch` to IaC only | Long-lived PAT / Azure |
 
@@ -57,21 +57,32 @@ Shared ACR platform prerequisites: [../operations.md](../operations.md).
 
 1. Confirm subscription `eb1b0038-3a72-459d-884c-ba2820dc53cc`, tenant
    `f1c96730-73a1-4159-81ab-0bb6731c8e75`, ACR `braddlesunravelsacr` Basic + ABAC +
-   ARM-audience auth, admin off.
-2. Protect IaC `main`, source `v*` tags, configure GitHub environments:
+   ARM-audience auth, admin off, platform RG `rg-platform-production` exists.
+2. **Move shared Key Vault first** (final home; do not leave secrets in a throwaway RG):
+
+```bash
+az resource move \
+  --destination-group rg-platform-production \
+  --ids "$(az keyvault show -n kv-acd-prod-braddles --query id -o tsv)"
+```
+
+   Smoke-test access-control after the move. Qwik cutover must not depend on a vault
+   still hosted in `rg-access-control-demo`.
+3. Protect IaC `main`, source `v*` tags, configure GitHub environments:
    - Source: `image-publish`
    - IaC: `production-plan`, `production` (required reviewers)
-3. Install GitHub App on IaC repo; store in source:
+4. Install GitHub App on IaC repo; store in source:
    - var `IAC_DISPATCH_APP_ID`
    - secret `IAC_DISPATCH_APP_PRIVATE_KEY`
-4. OIDC subjects must match the **actual** GitHub token `sub` claim.
+5. OIDC subjects must match the **actual** GitHub token `sub` claim.
    These repositories use **immutable** subjects (verified live on release):
    - Publisher: `repo:BraddlesUnravels@103235805/qwik-website@1367173842:environment:image-publish`
    - Planner: `repo:BraddlesUnravels@103235805/iac@1323677104:environment:production-plan`
    - Deployer: `repo:BraddlesUnravels@103235805/iac@1323677104:environment:production`
    Do not use legacy `repo:Owner/Name:environment:...` subjects for these repos.
-5. Validate locally: `npm ci --ignore-scripts && npm run validate`
-6. Subscription-scope foundation what-if then apply (operator identity):
+6. Validate locally: `npm ci --ignore-scripts && npm run validate`
+7. Subscription-scope foundation what-if then apply into the **existing** platform RG
+   (operator identity). Foundation does **not** create a resource group:
 
 ```bash
 # After reviewing rendered parameters; subjects must match live OIDC claims.
@@ -80,7 +91,7 @@ az deployment sub what-if \
   --template-file foundations/single-container-web/main.bicep \
   --parameters \
     location=australiaeast \
-    resourceGroupName=rg-qwik-website-production \
+    resourceGroupName=rg-platform-production \
     platformResourceGroupName=rg-platform-production \
     containerRegistryName=braddlesunravelsacr \
     logAnalyticsWorkspaceName=log-qwik-website-production \
@@ -94,15 +105,20 @@ az deployment sub what-if \
     deployerOidcSubject='repo:BraddlesUnravels@103235805/iac@1323677104:environment:production'
 ```
 
-7. Read back role assignments: principal, role ID, condition version 2.0, scope=ACR.
-8. Set GitHub environment variables:
+8. Read back role assignments: principal, role ID, condition version 2.0, scope=ACR.
+   Confirm deployer has the custom container-app deployer role — **not** Contributor.
+9. Set GitHub environment variables from the **new** UAMI client IDs:
    - Source `image-publish`: `AZURE_PUBLISHER_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`
    - IaC plan/deploy: `QWIK_PLAN_CLIENT_ID`, `QWIK_DEPLOY_CLIENT_ID`,
      `QWIK_AZURE_TENANT_ID`, `QWIK_AZURE_SUBSCRIPTION_ID`
-9. Merge IaC dispatch workflow to default branch **before** enabling source releases.
-10. Publish first stable Qwik release; approve IaC `production` if required.
-11. Second release + same-release replay + confirm `access-control-demo` and unrelated
-    ACR repositories remain unchanged.
+10. Re-bind Qwik pull identity secret-scoped `Key Vault Secrets User` on
+    `qwik-demo-general-access-code` in the moved vault.
+11. Issue managed certificates on the **new** ACA environment; update catalog cert IDs
+    under `rg-platform-production`; merge to IaC `main`.
+12. Publish a Qwik release; approve IaC `production` if required; verify custom domains.
+13. After verified cutover, delete resources in `rg-platform-production`, then the RG.
+14. Confirm `access-control-demo` still healthy (compute may remain in its legacy RG until
+    its migration; vault already final in platform RG).
 
 ### Planner what-if authorization repair
 
@@ -126,17 +142,17 @@ registry permissions:
 
 ```bash
 PLANNER_PRINCIPAL_ID=$(az identity show \
-  --resource-group rg-qwik-website-production \
+  --resource-group rg-platform-production \
   --name id-qwik-website-planner --query principalId --output tsv)
 
 az deployment group what-if \
-  --resource-group rg-qwik-website-production \
+  --resource-group rg-platform-production \
   --template-file modules/role-assignment/deployment-planner.bicep \
   --parameters plannerPrincipalId="$PLANNER_PRINCIPAL_ID"
 
 # Proceed only if the preview contains the intended role and assignment.
 az deployment group create \
-  --resource-group rg-qwik-website-production \
+  --resource-group rg-platform-production \
   --template-file modules/role-assignment/deployment-planner.bicep \
   --parameters plannerPrincipalId="$PLANNER_PRINCIPAL_ID" \
   --mode Incremental
@@ -144,7 +160,7 @@ az deployment group create \
 
 The full foundation reuses this module with the original deterministic role and
 assignment IDs. Confirm the planner has Reader and the custom
-deployment planner role on `rg-qwik-website-production`, allow RBAC propagation,
+deployment planner role on `rg-platform-production`, allow RBAC propagation,
 then trigger a fresh release dispatch after the fix is merged. Re-running an old
 workflow uses its original commit. Do not grant Contributor to the planner or
 attempt IAM changes from the release workflow.
@@ -176,7 +192,7 @@ az keyvault secret set --vault-name kv-acd-prod-braddles \
   --name qwik-demo-general-access-code --file ./code.txt --output none
 rm ./code.txt
 
-PRINCIPAL_ID=$(az identity show -g rg-qwik-website-production -n id-qwik-website-pull --query principalId -o tsv)
+PRINCIPAL_ID=$(az identity show -g rg-platform-production -n id-qwik-website-pull --query principalId -o tsv)
 VAULT_ID=$(az keyvault show -n kv-acd-prod-braddles --query id -o tsv)
 az role assignment create --role "Key Vault Secrets User" \
   --assignee-object-id "$PRINCIPAL_ID" --assignee-principal-type ServicePrincipal \

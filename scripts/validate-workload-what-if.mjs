@@ -95,6 +95,13 @@ export const validateWorkloadWhatIf = ({
     [normalizeResourceId(containerAppId), 'Microsoft.App/containerApps'],
   ]);
 
+  // Shared platform resources may live in the same RG as the workload. Release
+  // what-if must never mutate them, including Ignore-only noise from ACR/KV.
+  const forbiddenSharedTypeFragments = [
+    '/providers/microsoft.containerregistry/',
+    '/providers/microsoft.keyvault/',
+  ];
+
   const normalizedChanges = [];
 
   for (const change of changes) {
@@ -107,6 +114,12 @@ export const validateWorkloadWhatIf = ({
     }
 
     const normalizedId = normalizeResourceId(resourceId);
+
+    if (forbiddenSharedTypeFragments.some((fragment) => normalizedId.includes(fragment))) {
+      errors.push(`What-if targets a shared platform resource: ${resourceId}`);
+      continue;
+    }
+
     const expectedType = allowedResources.get(normalizedId);
 
     // Incremental previews include resources outside the template as Ignore.

@@ -9,8 +9,6 @@ param runtimeIdentityId string
 
 // Reader
 var readerRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'acdd72a7-3385-48ef-bd42-f606fba81ae7')
-// Contributor (RG-scoped deployer is an accepted simple initial setting)
-var contributorRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')
 // Managed Identity Operator
 var mioRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'f1a07417-d97a-45cb-824c-7a7467783830')
 
@@ -30,10 +28,45 @@ module plannerWhatIf 'deployment-planner.bicep' = {
   }
 }
 
-resource deployerContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroup().id, deployerPrincipalId, contributorRoleId, 'qwik-deployer-contributor')
+// Least-privilege deployer for shared platform RG: Container App release only.
+// Never Contributor — platform RG also hosts ACR and shared Key Vault.
+resource deployerRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
+  name: guid(resourceGroup().id, 'qwik-container-app-deployer')
   properties: {
-    roleDefinitionId: contributorRoleId
+    roleName: '${resourceGroup().name} container app deployer'
+    description: 'Deploy and update Container Apps release surface without ACR, Key Vault, or IAM write.'
+    type: 'CustomRole'
+    permissions: [
+      {
+        actions: [
+          'Microsoft.Resources/deployments/read'
+          'Microsoft.Resources/deployments/write'
+          'Microsoft.Resources/deployments/validate/action'
+          'Microsoft.Resources/deployments/whatIf/action'
+          'Microsoft.Resources/deployments/operations/read'
+          'Microsoft.Resources/subscriptions/resourcegroups/read'
+          'Microsoft.App/containerApps/read'
+          'Microsoft.App/containerApps/write'
+          'Microsoft.App/managedEnvironments/read'
+          'Microsoft.ManagedIdentity/userAssignedIdentities/read'
+          'Microsoft.OperationalInsights/workspaces/read'
+          'Microsoft.Authorization/roleAssignments/read'
+        ]
+        notActions: []
+        dataActions: []
+        notDataActions: []
+      }
+    ]
+    assignableScopes: [
+      resourceGroup().id
+    ]
+  }
+}
+
+resource deployerAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceGroup().id, deployerPrincipalId, deployerRole.id, 'qwik-container-app-deployer')
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', deployerRole.name)
     principalId: deployerPrincipalId
     principalType: 'ServicePrincipal'
   }
@@ -54,5 +87,6 @@ resource deployerMio 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 }
 
 output plannerReaderAssignmentId string = plannerReader.id
-output deployerContributorAssignmentId string = deployerContributor.id
+output deployerRoleId string = deployerRole.id
+output deployerAssignmentId string = deployerAssignment.id
 output deployerMioAssignmentId string = deployerMio.id

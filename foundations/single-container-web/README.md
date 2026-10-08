@@ -3,7 +3,7 @@
 Subscription-scoped foundation for a single external Container App workload that
 pulls from the shared platform ACR.
 
-Used today by **qwik-website** (`rg-qwik-website-production`).
+Used today by **qwik-website** inside **`rg-platform-production`**.
 
 This foundation does **not** deploy the Container App image/revision. Routine
 releases use `stacks/single-container-web` via `deploy-qwik-release.yml`.
@@ -15,23 +15,25 @@ workload needs its own adopt-in-place foundation (next migration).
 
 | Resource | Purpose |
 | --- | --- |
-| Workload resource group | Isolation boundary for the app |
 | Log Analytics workspace | Environment logging destination for this greenfield shape |
 | Container Apps environment | Host for the app |
-| Runtime UAMI | ACR repository pull (and future Key Vault refs if needed) |
+| Runtime UAMI | ACR repository pull + approved Key Vault secret refs |
 | Publisher UAMI + OIDC federated credential | Image push from the app repo |
 | Planner UAMI + OIDC federated credential | `what-if` / read path in IaC |
 | Deployer UAMI + OIDC federated credential | Container App apply path in IaC |
+| Least-privilege deployer custom role | Container App release only (not RG Contributor) |
+| Planner custom what-if role | validate/what-if without deploy write |
 | ACR ABAC repository roles | Publisher Writer + pull/planner/deployer Reader on one repository only |
 
-Does **not** create: shared ACR (see `platform/`), Container App revision, Key Vault,
-custom domain certificates (operator/certificate resources are catalogued and
-bound by the release stack), or `access-control-demo` resources.
+Does **not** create: the platform resource group, shared ACR (see `platform/`),
+shared Key Vault, Container App revision, custom domain certificates
+(operator/certificate resources are catalogued and bound by the release stack),
+or `access-control-demo` resources.
 
 ## Entry points
 
-- `main.bicep` — subscription scope; creates the resource group and nested deployment
-- `resources.bicep` — resource-group scope resources and role assignments
+- `main.bicep` — subscription scope; deploys into an **existing** platform RG
+- `resources.bicep` — resource-group scope resources and identities
 - `../../modules/role-assignment/deployment-planner.bicep` — RG-scoped planner-only
   RBAC repair; shared with the full foundation and preserves existing role IDs
 

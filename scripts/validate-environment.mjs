@@ -105,15 +105,6 @@ export const validateEnvironment = async (catalog) => {
       );
     }
 
-    if (
-      workload.resourceGroup.toLowerCase() ===
-      catalog.azure.platformResourceGroup.toLowerCase()
-    ) {
-      errors.push(
-        `${path}.resourceGroup must not target the shared platform resource group`,
-      );
-    }
-
     if (workload.containerRepository.length > 256) {
       errors.push(`${path}.containerRepository exceeds ACR repository name limits`);
     }
@@ -190,13 +181,20 @@ export const validateEnvironment = async (catalog) => {
       errors.push(`${path}.keyVaultName is required when secret names are configured`);
     }
 
-    trackUnique(
-      resourceGroups,
-      workload.resourceGroup.toLowerCase(),
-      application,
-      'resource group',
-      errors,
-    );
+    // Platform RG may host multiple workloads (ACR + apps + shared Key Vault).
+    // Non-platform resource groups remain unique per workload during migration.
+    const workloadResourceGroup = workload.resourceGroup.toLowerCase();
+    const platformResourceGroup = catalog.azure.platformResourceGroup.toLowerCase();
+
+    if (workloadResourceGroup !== platformResourceGroup) {
+      trackUnique(
+        resourceGroups,
+        workloadResourceGroup,
+        application,
+        'resource group',
+        errors,
+      );
+    }
     trackUnique(
       containerAppNames,
       `${workload.resourceGroup.toLowerCase()}/${workload.containerAppName.toLowerCase()}`,

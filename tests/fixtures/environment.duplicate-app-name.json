@@ -65,7 +65,7 @@
       }
     },
     "qwik-website": {
-      "resourceGroup": "rg-qwik-website-production",
+      "resourceGroup": "rg-platform-production",
       "stack": "single-container-web",
       "repository": "BraddlesUnravels/qwik-website",
       "repositoryId": "1367173842",
@@ -108,7 +108,7 @@
       }
     },
     "other-app": {
-      "resourceGroup": "rg-qwik-website-production",
+      "resourceGroup": "rg-platform-production",
       "stack": "single-container-web",
       "repository": "BraddlesUnravels/other",
       "repositoryId": "999999999",

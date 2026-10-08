@@ -143,10 +143,22 @@ const assertPlannerRole = (template) => {
   ), 'Planner what-if role must be assigned at the workload resource group');
 };
 
-const assertFoundationPlannerRole = (template) => {
-  const workloadTemplate = template.resources.find(
+const assertFoundationTemplate = (template) => {
+  const resourceGroupResources = template.resources.filter(
+    (resource) => resource.type === 'Microsoft.Resources/resourceGroups',
+  );
+  assert.equal(
+    resourceGroupResources.length,
+    0,
+    'Foundation must not create a resource group; workloads share the existing platform RG',
+  );
+
+  const workloadRoles = template.resources.find(
     (resource) => resource.name === 'workload-roles',
-  ).properties.template;
+  );
+  assert.ok(workloadRoles, 'Foundation must deploy workload-roles');
+
+  const workloadTemplate = workloadRoles.properties.template;
   const plannerAssignments = workloadTemplate.resources.filter(
     (resource) => resource.type === 'Microsoft.Authorization/roleAssignments'
       && resource.properties.principalId === "[parameters('plannerPrincipalId')]",
@@ -165,6 +177,25 @@ const assertFoundationPlannerRole = (template) => {
     "[parameters('plannerPrincipalId')]",
   );
   assertPlannerRole(plannerModule.properties.template);
+
+  const deployerRole = workloadTemplate.resources.find(
+    (resource) => resource.type === 'Microsoft.Authorization/roleDefinitions'
+      && resource.name === "[guid(resourceGroup().id, 'qwik-container-app-deployer')]",
+  );
+  assert.ok(deployerRole, 'Foundation must define a least-privilege container app deployer role');
+  assert.equal(deployerRole.properties.type, 'CustomRole');
+  assert.ok(
+    deployerRole.properties.permissions[0].actions.includes('Microsoft.App/containerApps/write'),
+    'Deployer role must allow Container App write',
+  );
+  assert.ok(
+    !deployerRole.properties.permissions[0].actions.some((action) => action.includes('KeyVault')),
+    'Deployer role must not include Key Vault actions',
+  );
+  assert.ok(
+    !JSON.stringify(workloadTemplate).includes('b24988ac-6180-42a0-ab88-20f7382dd24c'),
+    'Foundation must not assign RG Contributor to the deployer',
+  );
 };
 
 for (const entryPoint of entryPoints) {
@@ -189,7 +220,7 @@ for (const entryPoint of entryPoints) {
   }
 
   if (entryPoint === 'foundations/single-container-web/main.bicep') {
-    assertFoundationPlannerRole(JSON.parse(result.stdout));
+    assertFoundationTemplate(JSON.parse(result.stdout));
   }
 
   if (entryPoint === 'modules/role-assignment/deployment-planner.bicep') {

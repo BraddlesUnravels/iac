@@ -153,7 +153,7 @@ test('read-only planner what-if still rejects unrelated resource changes', async
   ], { env, encoding: 'utf8' });
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /unapproved resource/);
+  assert.match(result.stderr, /shared platform resource|unapproved resource/);
   const commands = await readFile(env.MOCK_AZ_LOG, 'utf8');
   assert.match(commands, /--validation-level ProviderNoRbac/);
   assert.doesNotMatch(commands, /deployment group create/);
