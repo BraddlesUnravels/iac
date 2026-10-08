@@ -27,8 +27,8 @@
       "publisherIdentityName": "id-access-control-production-publisher",
       "plannerIdentityName": "id-access-control-production-planner",
       "deployerIdentityName": "id-access-control-production-deployer",
-      "customDomainName": "aca.braddlesunravels.online",
-      "certificateResourceId": "/subscriptions/eb1b0038-3a72-459d-884c-ba2820dc53cc/resourceGroups/rg-platform-production/providers/Microsoft.App/managedEnvironments/acae-access-control-demo-production/managedCertificates/mc-aca-access-control-demo-placeholder",
+      "customDomainName": null,
+      "certificateResourceId": null,
       "allowedSecretNames": [
         "access-gate-code-secret",
         "access-gate-cookie-secret",
