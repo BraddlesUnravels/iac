@@ -35,12 +35,23 @@ jobs:
       - name: Resolve application and contract path
         id: resolve
         env:
-          EVENT_PATH: ${{ github.event_path }}
+          # Prefer the typed workflow context. Fall back to the runner event file
+          # (GITHUB_EVENT_PATH), not github.event_path which can be empty here.
+          APPLICATION_CONTEXT: ${{ github.event.client_payload.application }}
         shell: bash
         run: |
           set -euo pipefail
 
-          application="$(jq -er '.client_payload.application' "${EVENT_PATH}")"
+          application="${APPLICATION_CONTEXT:-}"
+          if [[ -z "${application}" ]]; then
+            event_file="${GITHUB_EVENT_PATH:-}"
+            if [[ -z "${event_file}" || ! -f "${event_file}" ]]; then
+              echo "GITHUB_EVENT_PATH is missing or unreadable: '${event_file}'" >&2
+              exit 1
+            fi
+            application="$(jq -er '.client_payload.application' "${event_file}")"
+          fi
+
           if [[ ! "${application}" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
             echo "Invalid application id: ${application}" >&2
             exit 1
@@ -92,7 +103,6 @@ jobs:
       - name: Materialize and verify client payload
         id: verify
         env:
-          EVENT_PATH: ${{ github.event_path }}
           APPLICATION: ${{ needs.resolve.outputs.application }}
           CONTRACT_FILE: ${{ needs.resolve.outputs.contract-file }}
           SOURCE_GITHUB_TOKEN: ${{ secrets.SOURCE_GITHUB_TOKEN }}
@@ -100,8 +110,14 @@ jobs:
         run: |
           set -euo pipefail
 
+          event_file="${GITHUB_EVENT_PATH:-}"
+          if [[ -z "${event_file}" || ! -f "${event_file}" ]]; then
+            echo "GITHUB_EVENT_PATH is missing or unreadable: '${event_file}'" >&2
+            exit 1
+          fi
+
           payload_file="${RUNNER_TEMP}/client-payload.json"
-          jq -e '.client_payload' "${EVENT_PATH}" > "${payload_file}"
+          jq -e '.client_payload' "${event_file}" > "${payload_file}"
 
           payload_application="$(jq -er '.application' "${payload_file}")"
           if [[ "${payload_application}" != "${APPLICATION}" ]]; then
@@ -349,15 +365,20 @@ jobs:
       - name: Re-verify release payload independently
         id: reverify
         env:
-          EVENT_PATH: ${{ github.event_path }}
           SOURCE_GITHUB_TOKEN: ${{ secrets.SOURCE_GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
 
+          event_file="${GITHUB_EVENT_PATH:-}"
+          if [[ -z "${event_file}" || ! -f "${event_file}" ]]; then
+            echo "GITHUB_EVENT_PATH is missing or unreadable: '${event_file}'" >&2
+            exit 1
+          fi
+
           payload_file="${RUNNER_TEMP}/client-payload.json"
           evidence_file="${RUNNER_TEMP}/release-evidence.json"
-          jq -e '.client_payload' "${EVENT_PATH}" > "${payload_file}"
+          jq -e '.client_payload' "${event_file}" > "${payload_file}"
 
           export IAC_REPOSITORY IAC_REPOSITORY_ID
           node scripts/verify-release.mjs \
