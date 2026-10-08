@@ -31,26 +31,11 @@ jobs:
     outputs:
       application: ${{ steps.resolve.outputs.application }}
       contract-file: ${{ steps.resolve.outputs.contract-file }}
-      plan-client-id: ${{ steps.resolve.outputs.plan-client-id }}
-      deploy-client-id: ${{ steps.resolve.outputs.deploy-client-id }}
-      azure-tenant-id: ${{ steps.resolve.outputs.azure-tenant-id }}
-      azure-subscription-id: ${{ steps.resolve.outputs.azure-subscription-id }}
     steps:
-      - name: Resolve application and Azure login vars
+      - name: Resolve application and contract path
         id: resolve
         env:
           EVENT_PATH: ${{ github.event_path }}
-          QWIK_PLAN_CLIENT_ID: ${{ vars.QWIK_PLAN_CLIENT_ID }}
-          QWIK_DEPLOY_CLIENT_ID: ${{ vars.QWIK_DEPLOY_CLIENT_ID }}
-          QWIK_AZURE_TENANT_ID: ${{ vars.QWIK_AZURE_TENANT_ID }}
-          QWIK_AZURE_SUBSCRIPTION_ID: ${{ vars.QWIK_AZURE_SUBSCRIPTION_ID }}
-          ACCESS_CONTROL_DEMO_PLAN_CLIENT_ID: ${{ vars.ACCESS_CONTROL_DEMO_PLAN_CLIENT_ID }}
-          ACCESS_CONTROL_DEMO_DEPLOY_CLIENT_ID: ${{ vars.ACCESS_CONTROL_DEMO_DEPLOY_CLIENT_ID }}
-          ACCESS_CONTROL_DEMO_AZURE_TENANT_ID: ${{ vars.ACCESS_CONTROL_DEMO_AZURE_TENANT_ID }}
-          ACCESS_CONTROL_DEMO_AZURE_SUBSCRIPTION_ID: ${{ vars.ACCESS_CONTROL_DEMO_AZURE_SUBSCRIPTION_ID }}
-          # Shared fallbacks when per-app tenant/sub vars are unset.
-          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
         shell: bash
         run: |
           set -euo pipefail
@@ -61,20 +46,8 @@ jobs:
             exit 1
           fi
 
-          contract_file="workloads/${application}/production.json"
-
           case "${application}" in
-            qwik-website)
-              plan_client_id="${QWIK_PLAN_CLIENT_ID:-}"
-              deploy_client_id="${QWIK_DEPLOY_CLIENT_ID:-}"
-              tenant_id="${QWIK_AZURE_TENANT_ID:-${AZURE_TENANT_ID:-}}"
-              subscription_id="${QWIK_AZURE_SUBSCRIPTION_ID:-${AZURE_SUBSCRIPTION_ID:-}}"
-              ;;
-            access-control-demo)
-              plan_client_id="${ACCESS_CONTROL_DEMO_PLAN_CLIENT_ID:-}"
-              deploy_client_id="${ACCESS_CONTROL_DEMO_DEPLOY_CLIENT_ID:-}"
-              tenant_id="${ACCESS_CONTROL_DEMO_AZURE_TENANT_ID:-${AZURE_TENANT_ID:-}}"
-              subscription_id="${ACCESS_CONTROL_DEMO_AZURE_SUBSCRIPTION_ID:-${AZURE_SUBSCRIPTION_ID:-}}"
+            qwik-website|access-control-demo)
               ;;
             *)
               echo "Unsupported single-container application: ${application}" >&2
@@ -82,20 +55,11 @@ jobs:
               ;;
           esac
 
-          for required in plan_client_id deploy_client_id tenant_id subscription_id; do
-            if [[ -z "${!required}" ]]; then
-              echo "Missing GitHub Actions variable mapping for ${application}: ${required}" >&2
-              exit 1
-            fi
-          done
+          contract_file="workloads/${application}/production.json"
 
           {
             echo "application=${application}"
             echo "contract-file=${contract_file}"
-            echo "plan-client-id=${plan_client_id}"
-            echo "deploy-client-id=${deploy_client_id}"
-            echo "azure-tenant-id=${tenant_id}"
-            echo "azure-subscription-id=${subscription_id}"
           } >> "${GITHUB_OUTPUT}"
 
   verify-release:
@@ -211,12 +175,59 @@ jobs:
       - name: Install pinned Bicep CLI
         run: az bicep install --version v0.47.16
 
+      # Client IDs live on the production-plan environment; resolve has no env context.
+      - name: Resolve planner Azure login vars
+        id: azure_login_vars
+        env:
+          APPLICATION: ${{ needs.resolve.outputs.application }}
+          QWIK_PLAN_CLIENT_ID: ${{ vars.QWIK_PLAN_CLIENT_ID }}
+          QWIK_AZURE_TENANT_ID: ${{ vars.QWIK_AZURE_TENANT_ID }}
+          QWIK_AZURE_SUBSCRIPTION_ID: ${{ vars.QWIK_AZURE_SUBSCRIPTION_ID }}
+          ACCESS_CONTROL_DEMO_PLAN_CLIENT_ID: ${{ vars.ACCESS_CONTROL_DEMO_PLAN_CLIENT_ID }}
+          ACCESS_CONTROL_DEMO_AZURE_TENANT_ID: ${{ vars.ACCESS_CONTROL_DEMO_AZURE_TENANT_ID }}
+          ACCESS_CONTROL_DEMO_AZURE_SUBSCRIPTION_ID: ${{ vars.ACCESS_CONTROL_DEMO_AZURE_SUBSCRIPTION_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          case "${APPLICATION}" in
+            qwik-website)
+              client_id="${QWIK_PLAN_CLIENT_ID:-}"
+              tenant_id="${QWIK_AZURE_TENANT_ID:-${AZURE_TENANT_ID:-}}"
+              subscription_id="${QWIK_AZURE_SUBSCRIPTION_ID:-${AZURE_SUBSCRIPTION_ID:-}}"
+              ;;
+            access-control-demo)
+              client_id="${ACCESS_CONTROL_DEMO_PLAN_CLIENT_ID:-}"
+              tenant_id="${ACCESS_CONTROL_DEMO_AZURE_TENANT_ID:-${AZURE_TENANT_ID:-}}"
+              subscription_id="${ACCESS_CONTROL_DEMO_AZURE_SUBSCRIPTION_ID:-${AZURE_SUBSCRIPTION_ID:-}}"
+              ;;
+            *)
+              echo "Unsupported single-container application: ${APPLICATION}" >&2
+              exit 1
+              ;;
+          esac
+
+          for required in client_id tenant_id subscription_id; do
+            if [[ -z "${!required}" ]]; then
+              echo "Missing production-plan environment variable for ${APPLICATION}: ${required}" >&2
+              exit 1
+            fi
+          done
+
+          {
+            echo "client-id=${client_id}"
+            echo "tenant-id=${tenant_id}"
+            echo "subscription-id=${subscription_id}"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Sign in as workload planner
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
-          client-id: ${{ needs.resolve.outputs.plan-client-id }}
-          tenant-id: ${{ needs.resolve.outputs.azure-tenant-id }}
-          subscription-id: ${{ needs.resolve.outputs.azure-subscription-id }}
+          client-id: ${{ steps.azure_login_vars.outputs.client-id }}
+          tenant-id: ${{ steps.azure_login_vars.outputs.tenant-id }}
+          subscription-id: ${{ steps.azure_login_vars.outputs.subscription-id }}
 
       - name: Write evidence and run preflight/what-if
         env:
@@ -281,12 +292,59 @@ jobs:
       - name: Install pinned Bicep CLI
         run: az bicep install --version v0.47.16
 
+      # Client IDs live on the production environment; resolve has no env context.
+      - name: Resolve deployer Azure login vars
+        id: azure_login_vars
+        env:
+          APPLICATION: ${{ needs.resolve.outputs.application }}
+          QWIK_DEPLOY_CLIENT_ID: ${{ vars.QWIK_DEPLOY_CLIENT_ID }}
+          QWIK_AZURE_TENANT_ID: ${{ vars.QWIK_AZURE_TENANT_ID }}
+          QWIK_AZURE_SUBSCRIPTION_ID: ${{ vars.QWIK_AZURE_SUBSCRIPTION_ID }}
+          ACCESS_CONTROL_DEMO_DEPLOY_CLIENT_ID: ${{ vars.ACCESS_CONTROL_DEMO_DEPLOY_CLIENT_ID }}
+          ACCESS_CONTROL_DEMO_AZURE_TENANT_ID: ${{ vars.ACCESS_CONTROL_DEMO_AZURE_TENANT_ID }}
+          ACCESS_CONTROL_DEMO_AZURE_SUBSCRIPTION_ID: ${{ vars.ACCESS_CONTROL_DEMO_AZURE_SUBSCRIPTION_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          case "${APPLICATION}" in
+            qwik-website)
+              client_id="${QWIK_DEPLOY_CLIENT_ID:-}"
+              tenant_id="${QWIK_AZURE_TENANT_ID:-${AZURE_TENANT_ID:-}}"
+              subscription_id="${QWIK_AZURE_SUBSCRIPTION_ID:-${AZURE_SUBSCRIPTION_ID:-}}"
+              ;;
+            access-control-demo)
+              client_id="${ACCESS_CONTROL_DEMO_DEPLOY_CLIENT_ID:-}"
+              tenant_id="${ACCESS_CONTROL_DEMO_AZURE_TENANT_ID:-${AZURE_TENANT_ID:-}}"
+              subscription_id="${ACCESS_CONTROL_DEMO_AZURE_SUBSCRIPTION_ID:-${AZURE_SUBSCRIPTION_ID:-}}"
+              ;;
+            *)
+              echo "Unsupported single-container application: ${APPLICATION}" >&2
+              exit 1
+              ;;
+          esac
+
+          for required in client_id tenant_id subscription_id; do
+            if [[ -z "${!required}" ]]; then
+              echo "Missing production environment variable for ${APPLICATION}: ${required}" >&2
+              exit 1
+            fi
+          done
+
+          {
+            echo "client-id=${client_id}"
+            echo "tenant-id=${tenant_id}"
+            echo "subscription-id=${subscription_id}"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Sign in as workload deployer
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
-          client-id: ${{ needs.resolve.outputs.deploy-client-id }}
-          tenant-id: ${{ needs.resolve.outputs.azure-tenant-id }}
-          subscription-id: ${{ needs.resolve.outputs.azure-subscription-id }}
+          client-id: ${{ steps.azure_login_vars.outputs.client-id }}
+          tenant-id: ${{ steps.azure_login_vars.outputs.tenant-id }}
+          subscription-id: ${{ steps.azure_login_vars.outputs.subscription-id }}
 
       - name: Re-verify release payload independently
         id: reverify
