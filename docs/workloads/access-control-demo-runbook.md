@@ -56,17 +56,22 @@ Application repository should:
    - or alias `access-control-demo-release-v1`
 5. Stop GHCR production publish and stop app-repo Azure Bicep apply.
 
-## Cutover sequence
+## Cutover status (complete 2026-10-08)
 
-1. Merge IaC catalog/contract/workflow changes (this repo).
-2. Foundation what-if + apply for access-control names into platform RG.
-3. Set GitHub client id variables (`ACCESS_CONTROL_DEMO_*`).
-4. Seed KV secrets + secret-scoped RBAC for new runtime identity.
-5. Create managed cert on new env; replace catalog placeholder cert id; merge.
-6. First release (tag or manual main); approve plan/apply; verify default FQDN `/api/health`.
-7. Bind custom domain SNI; operator updates GoDaddy `aca` CNAME to new FQDN.
-8. Verify `https://aca.braddlesunravels.online/api/health`.
-9. Decommission `rg-access-control-demo` (delete certs/env explicitly if RG sticks).
+All cutover steps are done:
+
+1. IaC catalog/contract/generic single-container release on `main`.
+2. Foundation applied into `rg-platform-production` (separate ACA env + UAMIs).
+3. GitHub `ACCESS_CONTROL_DEMO_*` plan/deploy client ids + ACD `image-publish` publisher vars set.
+4. KV secrets + secret-scoped RBAC for `id-access-control-demo-secrets`.
+5. Managed cert `mc-acae-access-co-aca-braddlesunra-6866` issued; catalog/contract sticky domain enabled.
+6. Production releases via ACD `release.yml` → ACR → `single-container-web-release-v1`.
+7. GoDaddy `aca` CNAME → platform default FQDN; SNI binding active.
+8. Public health: `https://aca.braddlesunravels.online/api/health` → 200.
+9. `rg-access-control-demo` deleted. Legacy ACD GitHub `production` env secrets/vars removed.
+
+Default FQDN:
+`aca-access-control-demo.greenwave-bd9d2bee.australiaeast.azurecontainerapps.io`
 
 ## OIDC subjects
 
