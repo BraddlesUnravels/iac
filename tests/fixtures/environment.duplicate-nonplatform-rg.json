@@ -14,7 +14,7 @@
   "workloads": {
     "access-control-demo": {
       "resourceGroup": "rg-access-control-demo",
-      "stack": "access-control-demo",
+      "stack": "single-container-web",
       "repository": "braddlesunravels/access-control-demo",
       "repositoryId": "1298659298",
       "repositoryOwnerId": "103235805",
@@ -31,16 +31,15 @@
       "certificateResourceId": "/subscriptions/eb1b0038-3a72-459d-884c-ba2820dc53cc/resourceGroups/rg-access-control-demo/providers/Microsoft.App/managedEnvironments/aca-access-control-demo/managedCertificates/example-certificate",
       "allowedSecretNames": [
         "access-gate-code-secret",
-        "access-gate-cookie-secret"
+        "access-gate-cookie-secret",
+        "next-supabase-publishable-key",
+        "next-supabase-url"
       ],
       "migrationSecretNames": [
         "supabase-access-token",
         "supabase-db-password"
       ],
-      "externalEnvironmentVariables": [
-        "NEXT_SUPABASE_URL",
-        "NEXT_SUPABASE_PUBLISHABLE_KEY"
-      ],
+      "externalEnvironmentVariables": [],
       "bounds": {
         "targetPorts": [
           3000

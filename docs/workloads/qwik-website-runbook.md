@@ -116,7 +116,7 @@ az deployment sub what-if \
 11. Issue managed certificates on the **new** ACA environment; update catalog cert IDs
     under `rg-platform-production`; merge to IaC `main`.
 12. Publish a Qwik release; approve IaC `production` if required; verify custom domains.
-13. After verified cutover, delete resources in `rg-platform-production`, then the RG.
+13. After verified cutover, delete resources in the **old** dedicated Qwik RG only (never `rg-platform-production`).
 14. Confirm `access-control-demo` still healthy (compute may remain in its legacy RG until
     its migration; vault already final in platform RG).
 

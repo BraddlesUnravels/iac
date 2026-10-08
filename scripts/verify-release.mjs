@@ -121,10 +121,11 @@ export const verifyRelease = async ({
       'sourceRunId must be a positive decimal string',
     );
   }
+  const isMainChannel = payload.releaseTag === 'main';
   rejectField(
     errors,
-    !releaseTagPattern.test(payload.releaseTag),
-    'releaseTag must match vMAJOR.MINOR.PATCH',
+    !(releaseTagPattern.test(payload.releaseTag) || isMainChannel),
+    'releaseTag must match vMAJOR.MINOR.PATCH or equal main',
   );
   rejectField(
     errors,
@@ -199,29 +200,46 @@ export const verifyRelease = async ({
   let repository;
   let release;
   let tagCommitSha;
+  let releasePublishedAt;
+  let releaseHtmlUrl;
 
   try {
     repository = await githubClient(
       `https://api.github.com/repos/${workload.repository}`,
       { headers },
     );
-    release = await githubClient(
-      `https://api.github.com/repos/${workload.repository}/releases/${payload.releaseId}`,
-      { headers },
-    );
 
-    const ref = await githubClient(
-      `https://api.github.com/repos/${workload.repository}/git/ref/tags/${encodeURIComponent(payload.releaseTag)}`,
-      { headers },
-    );
-
-    if (ref.object?.type === 'commit') {
-      tagCommitSha = ref.object.sha;
-    } else if (ref.object?.type === 'tag') {
-      const tagObject = await githubClient(ref.object.url, { headers });
-      tagCommitSha = tagObject.object?.sha;
+    if (isMainChannel) {
+      // Manual main deploys: releaseId is the source workflow run id; commit must be main HEAD.
+      const mainRef = await githubClient(
+        `https://api.github.com/repos/${workload.repository}/git/ref/heads/main`,
+        { headers },
+      );
+      tagCommitSha = mainRef.object?.sha;
+      releasePublishedAt = null;
+      releaseHtmlUrl = `https://github.com/${workload.repository}/commit/${payload.sourceCommitSha}`;
     } else {
-      errors.push('Release tag does not resolve to a commit');
+      release = await githubClient(
+        `https://api.github.com/repos/${workload.repository}/releases/${payload.releaseId}`,
+        { headers },
+      );
+
+      const ref = await githubClient(
+        `https://api.github.com/repos/${workload.repository}/git/ref/tags/${encodeURIComponent(payload.releaseTag)}`,
+        { headers },
+      );
+
+      if (ref.object?.type === 'commit') {
+        tagCommitSha = ref.object.sha;
+      } else if (ref.object?.type === 'tag') {
+        const tagObject = await githubClient(ref.object.url, { headers });
+        tagCommitSha = tagObject.object?.sha;
+      } else {
+        errors.push('Release tag does not resolve to a commit');
+      }
+
+      releasePublishedAt = release.published_at;
+      releaseHtmlUrl = release.html_url;
     }
   } catch (error) {
     return {
@@ -249,26 +267,36 @@ export const verifyRelease = async ({
     errors.push('GitHub repository full_name does not match catalog');
   }
 
-  if (release.draft === true) {
-    errors.push('Release is a draft');
-  }
+  if (!isMainChannel) {
+    if (release.draft === true) {
+      errors.push('Release is a draft');
+    }
 
-  if (release.prerelease === true) {
-    errors.push('Release is a prerelease');
-  }
+    if (release.prerelease === true) {
+      errors.push('Release is a prerelease');
+    }
 
-  if (!release.published_at) {
-    errors.push('Release is not published');
-  }
+    if (!release.published_at) {
+      errors.push('Release is not published');
+    }
 
-  if (release.tag_name !== payload.releaseTag) {
-    errors.push('Release tag_name does not match payload releaseTag');
+    if (release.tag_name !== payload.releaseTag) {
+      errors.push('Release tag_name does not match payload releaseTag');
+    }
   }
 
   if (!shaPattern.test(String(tagCommitSha ?? ''))) {
-    errors.push('Peeled tag commit SHA is missing or malformed');
+    errors.push(
+      isMainChannel
+        ? 'main branch commit SHA is missing or malformed'
+        : 'Peeled tag commit SHA is missing or malformed',
+    );
   } else if (tagCommitSha !== payload.sourceCommitSha) {
-    errors.push('Release tag commit does not match sourceCommitSha');
+    errors.push(
+      isMainChannel
+        ? 'main HEAD commit does not match sourceCommitSha'
+        : 'Release tag commit does not match sourceCommitSha',
+    );
   }
 
   if (errors.length > 0) {
@@ -283,8 +311,8 @@ export const verifyRelease = async ({
     sourceRepositoryOwnerId: workload.repositoryOwnerId,
     releaseId: String(payload.releaseId),
     releaseTag: payload.releaseTag,
-    releasePublishedAt: release.published_at,
-    releaseHtmlUrl: release.html_url,
+    releasePublishedAt,
+    releaseHtmlUrl,
     sourceCommitSha: payload.sourceCommitSha,
     imageTag: payload.imageTag,
     imageDigest: payload.imageDigest,

@@ -17,10 +17,10 @@ examples of the contract model, not as shared production credentials.
 | Static validation (schemas, contracts, images, Bicep, ShellCheck, Checkov) | Implemented and enforced in CI |
 | Shared platform RG (`rg-platform-production`) | Hosts ACR, shared Key Vault, and Qwik workload resources |
 | Shared platform ACR (`braddlesunravelsacr`) | Deployed, verified, idempotent `what-if` |
-| Qwik website foundation + release path | Implemented; foundation deploys into existing platform RG; release via `deploy-qwik-release.yml` |
+| Qwik website foundation + release path | Implemented; foundation deploys into existing platform RG; release via generic single-container workflow |
 | Sticky custom domains for Qwik (`www` + apex) | Implemented in catalog, stack, and module |
-| `access-control-demo` | **Catalogued; compute still live in legacy RG until brownfield migration** |
-| Generic reusable `workflow_call` deploy/teardown | Not implemented (Qwik uses IaC-owned `repository_dispatch`) |
+| `access-control-demo` | **Catalog + contract + generic release path in IaC; compute still live in legacy RG until foundation/cutover** |
+| Generic single-container release workflow | Implemented (`deploy-single-container-release.yml`; per-app dispatch aliases retained) |
 | Prototype stacks (`next-supabase`, `qwik-elysia-postgres`) | Present for shape experiments; not production paths |
 
 **Consolidation:** Qwik and shared secrets target `rg-platform-production` only.
@@ -28,11 +28,10 @@ Move `kv-acd-prod-braddles` into the platform RG before Qwik cutover so secrets
 are never left in a throwaway group. Delete `rg-qwik-website-production` only
 after verified DNS cutover.
 
-**Next migration:** adopt and deploy `access-control-demo` through this
-repository into the same platform RG (brownfield foundation + hosted Supabase
-migration job + parity checks). Until that work lands, the live access-control
-app continues on its application-repo workflow for compute, while the shared
-vault already lives in the platform RG.
+**Next operator steps for access-control:** apply foundation UAMIs/env into
+`rg-platform-production`, seed KV secrets (`next-supabase-url`,
+`next-supabase-publishable-key`, access-gate names), wire GitHub client IDs,
+cut app-repo release to ACR + dispatch, issue certs, DNS cutover, delete legacy RG.
 
 ## Architecture
 
@@ -64,10 +63,11 @@ rg-platform-production
 ├── Qwik foundation + app (this repo)
 │   ├── Log Analytics, ACA env, UAMIs, ABAC repo roles
 │   └── Container App + sticky custom domains
-└── (later) access-control resources
+└── access-control foundation + app (in progress cutover)
+    ├── Log Analytics, ACA env, UAMIs, ABAC repo roles
+    └── Container App + custom domain (after cert + DNS)
 
-rg-access-control-demo                 # legacy compute only until migration
-└── still owned by the application deployment path for the app/env
+rg-access-control-demo                 # legacy compute until cutover complete
 ```
 
 Deployer identities use a least-privilege custom role (Container App release
@@ -85,7 +85,8 @@ Historical plans (not live status): [docs/plans/](docs/plans/).
 .github/workflows/
   validate.yml                 # seven static validation jobs on every PR/push
   deploy-platform.yml          # guarded shared-ACR platform deploy
-  deploy-qwik-release.yml      # release-driven Qwik Container App deploy
+  deploy-single-container-release.yml  # generic single-container release path
+  deploy-qwik-release.yml      # legacy notice alias (dispatch handled generically)
 docs/
   operations.md                # shared ACR operations
   reusable-iac-design.md       # durable architecture
@@ -100,22 +101,22 @@ platform/                      # subscription entry point for shared ACR
 schemas/                       # environment + workload JSON Schemas
 scripts/                       # validate, render, deploy, verify helpers
 stacks/
-  single-container-web/        # production release stack (Qwik)
+  single-container-web/        # production release stack (Qwik + access-control)
   next-supabase/               # prototype only
   qwik-elysia-postgres/        # prototype only (production-disabled)
 tests/                         # validators + safe/unsafe fixtures
 workloads/
-  qwik-website/production.json # committed non-secret workload contract
+  qwik-website/production.json
+  access-control-demo/production.json
 ```
 
 ## App shapes
 
 | Stack | Role | Compute | Data |
 | --- | --- | --- | --- |
-| `single-container-web` | **Production path** (Qwik today) | One external Container App | None in Azure (static/SSR app) |
-| `next-supabase` | Prototype | One external Container App (port 3000) | Hosted Supabase (external) |
+| `single-container-web` | **Production path** (Qwik + access-control-demo) | One external Container App | App-specific; ACD uses hosted Supabase via KV secret refs |
+| `next-supabase` | Prototype | One external Container App (port 3000) | Hosted Supabase (external; not production) |
 | `qwik-elysia-postgres` | Prototype | UI + API Container Apps | Azure PostgreSQL Flexible Server |
-| `access-control-demo` | **Next migration** | Catalogued; stack/foundation not in repo yet | Hosted Supabase + Key Vault secrets |
 
 Images are built and tested in application CI, published to ACR as a full
 40-character Git SHA tag, and deployed by digest. This repository does not own
@@ -168,9 +169,8 @@ work; they are documented in the workflow and must not expand silently.
 | Workflow / script | Scope | Notes |
 | --- | --- | --- |
 | `deploy-platform.yml` / `scripts/deploy-platform.sh` | Shared ACR only | Manual, protected, confirmation phrase required |
-| `deploy-qwik-release.yml` / `scripts/deploy-workload-release.sh` | Qwik Container App only | Triggered by source release dispatch; plan then protected apply |
+| `deploy-single-container-release.yml` / `scripts/deploy-workload-release.sh` | Any catalogued `single-container-web` app | Source dispatch; plan then protected apply; per-app client IDs |
 | `scripts/deploy-stack.sh` | Local prototype stack helper | Not a production path |
-| `access-control-demo` | — | **Not deployed from this repository yet** |
 
 See [docs/operations.md](docs/operations.md) before any platform preview or apply.
 See [docs/workloads/qwik-website-runbook.md](docs/workloads/qwik-website-runbook.md) for Qwik bootstrap and release.
@@ -179,8 +179,8 @@ See [docs/workloads/qwik-website-runbook.md](docs/workloads/qwik-website-runbook
 
 - Tags always include `application`, `environment`, and `managedBy: bicep`.
 - Runtime secret values never pass through Bicep, repository files, GitHub Secrets, workflow inputs, artifacts, outputs, or logs.
-- Application contracts declare approved Key Vault secret **names** only (when secrets exist). Qwik currently has an empty secret set.
-- Non-secret external settings (for example future Supabase URL/key names) come from allow-listed GitHub environment variables resolved through the catalog.
+- Application contracts declare approved Key Vault secret **names** only (when secrets exist). Values never enter GitHub or Bicep parameters.
+- access-control runtime Supabase URL and publishable key are **Key Vault secrets**, not plain contract env or GH-injected Container App secrets.
 - Container Apps default to the Consumption workload profile.
 - Custom domain hostnames and certificate resource IDs live in the environment catalog; the workload contract only toggles `customDomain.enabled`.
 - The PostgreSQL prototype stack cannot be selected for production.
@@ -192,7 +192,7 @@ See [docs/workloads/qwik-website-runbook.md](docs/workloads/qwik-website-runbook
 - Redis / messaging
 - Application Dockerfiles (remain in app repos)
 - Automatic teardown of platform or brownfield workload resources
-- Deploying `access-control-demo` before its dedicated migration (next)
+- Auto-deploy on every push to main (tag or manual main dispatch only)
 
 ## Documentation map
 

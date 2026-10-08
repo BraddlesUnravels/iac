@@ -2,16 +2,13 @@
 
 Production release stack for one external Azure Container App.
 
-**Current consumer:** `qwik-website`  
-**Contract:** `workloads/qwik-website/production.json`  
-**Deploy workflow:** `.github/workflows/deploy-qwik-release.yml`
+**Consumers:** `qwik-website`, `access-control-demo`  
+**Contracts:** `workloads/<application>/production.json`  
+**Deploy workflow:** `.github/workflows/deploy-single-container-release.yml`
 
-This stack is the supported production path. Prototype stacks under
-`next-supabase` and `qwik-elysia-postgres` are not production paths.
-
-This repository does **not** deploy `access-control-demo` with this stack. That
-app remains on its existing pipeline until a dedicated brownfield stack and
-foundation are added (next migration).
+This stack is the supported production path for all single-container web apps.
+Prototype stacks under `next-supabase` and `qwik-elysia-postgres` are not
+production paths.
 
 ## Prerequisites
 

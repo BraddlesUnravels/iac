@@ -1,0 +1,456 @@
+name: Deploy single-container-web release
+
+# Generic production path for every workloads/* contract on stacks/single-container-web.
+# Source repos dispatch single-container-web-release-v1 (preferred) or a legacy
+# per-app alias. Application is always taken from client_payload.application.
+
+on:
+  repository_dispatch:
+    types:
+      - single-container-web-release-v1
+      - qwik-website-release-v1
+      - access-control-demo-release-v1
+
+permissions:
+  contents: read
+
+concurrency:
+  group: single-container-${{ github.event.client_payload.application || 'unknown' }}-production
+  cancel-in-progress: false
+
+env:
+  CATALOG_FILE: environments/production.json
+  IAC_REPOSITORY: BraddlesUnravels/iac
+  IAC_REPOSITORY_ID: '1323677104'
+
+jobs:
+  resolve:
+    name: 00 / Resolve application
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      application: ${{ steps.resolve.outputs.application }}
+      contract-file: ${{ steps.resolve.outputs.contract-file }}
+      plan-client-id: ${{ steps.resolve.outputs.plan-client-id }}
+      deploy-client-id: ${{ steps.resolve.outputs.deploy-client-id }}
+      azure-tenant-id: ${{ steps.resolve.outputs.azure-tenant-id }}
+      azure-subscription-id: ${{ steps.resolve.outputs.azure-subscription-id }}
+    steps:
+      - name: Resolve application and Azure login vars
+        id: resolve
+        env:
+          EVENT_PATH: ${{ github.event_path }}
+          QWIK_PLAN_CLIENT_ID: ${{ vars.QWIK_PLAN_CLIENT_ID }}
+          QWIK_DEPLOY_CLIENT_ID: ${{ vars.QWIK_DEPLOY_CLIENT_ID }}
+          QWIK_AZURE_TENANT_ID: ${{ vars.QWIK_AZURE_TENANT_ID }}
+          QWIK_AZURE_SUBSCRIPTION_ID: ${{ vars.QWIK_AZURE_SUBSCRIPTION_ID }}
+          ACCESS_CONTROL_DEMO_PLAN_CLIENT_ID: ${{ vars.ACCESS_CONTROL_DEMO_PLAN_CLIENT_ID }}
+          ACCESS_CONTROL_DEMO_DEPLOY_CLIENT_ID: ${{ vars.ACCESS_CONTROL_DEMO_DEPLOY_CLIENT_ID }}
+          ACCESS_CONTROL_DEMO_AZURE_TENANT_ID: ${{ vars.ACCESS_CONTROL_DEMO_AZURE_TENANT_ID }}
+          ACCESS_CONTROL_DEMO_AZURE_SUBSCRIPTION_ID: ${{ vars.ACCESS_CONTROL_DEMO_AZURE_SUBSCRIPTION_ID }}
+          # Shared fallbacks when per-app tenant/sub vars are unset.
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          application="$(jq -er '.client_payload.application' "${EVENT_PATH}")"
+          if [[ ! "${application}" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+            echo "Invalid application id: ${application}" >&2
+            exit 1
+          fi
+
+          contract_file="workloads/${application}/production.json"
+
+          case "${application}" in
+            qwik-website)
+              plan_client_id="${QWIK_PLAN_CLIENT_ID:-}"
+              deploy_client_id="${QWIK_DEPLOY_CLIENT_ID:-}"
+              tenant_id="${QWIK_AZURE_TENANT_ID:-${AZURE_TENANT_ID:-}}"
+              subscription_id="${QWIK_AZURE_SUBSCRIPTION_ID:-${AZURE_SUBSCRIPTION_ID:-}}"
+              ;;
+            access-control-demo)
+              plan_client_id="${ACCESS_CONTROL_DEMO_PLAN_CLIENT_ID:-}"
+              deploy_client_id="${ACCESS_CONTROL_DEMO_DEPLOY_CLIENT_ID:-}"
+              tenant_id="${ACCESS_CONTROL_DEMO_AZURE_TENANT_ID:-${AZURE_TENANT_ID:-}}"
+              subscription_id="${ACCESS_CONTROL_DEMO_AZURE_SUBSCRIPTION_ID:-${AZURE_SUBSCRIPTION_ID:-}}"
+              ;;
+            *)
+              echo "Unsupported single-container application: ${application}" >&2
+              exit 1
+              ;;
+          esac
+
+          for required in plan_client_id deploy_client_id tenant_id subscription_id; do
+            if [[ -z "${!required}" ]]; then
+              echo "Missing GitHub Actions variable mapping for ${application}: ${required}" >&2
+              exit 1
+            fi
+          done
+
+          {
+            echo "application=${application}"
+            echo "contract-file=${contract_file}"
+            echo "plan-client-id=${plan_client_id}"
+            echo "deploy-client-id=${deploy_client_id}"
+            echo "azure-tenant-id=${tenant_id}"
+            echo "azure-subscription-id=${subscription_id}"
+          } >> "${GITHUB_OUTPUT}"
+
+  verify-release:
+    name: 01 / Verify release provenance
+    needs: [resolve]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      evidence: ${{ steps.verify.outputs.evidence }}
+      source-commit-sha: ${{ steps.verify.outputs.source-commit-sha }}
+      image-digest: ${{ steps.verify.outputs.image-digest }}
+      release-id: ${{ steps.verify.outputs.release-id }}
+      release-tag: ${{ steps.verify.outputs.release-tag }}
+      application: ${{ needs.resolve.outputs.application }}
+    steps:
+      - name: Check out IaC default branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Materialize and verify client payload
+        id: verify
+        env:
+          EVENT_PATH: ${{ github.event_path }}
+          APPLICATION: ${{ needs.resolve.outputs.application }}
+          CONTRACT_FILE: ${{ needs.resolve.outputs.contract-file }}
+          SOURCE_GITHUB_TOKEN: ${{ secrets.SOURCE_GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          payload_file="${RUNNER_TEMP}/client-payload.json"
+          jq -e '.client_payload' "${EVENT_PATH}" > "${payload_file}"
+
+          payload_application="$(jq -er '.application' "${payload_file}")"
+          if [[ "${payload_application}" != "${APPLICATION}" ]]; then
+            echo "Payload application ${payload_application} does not match resolved ${APPLICATION}" >&2
+            exit 1
+          fi
+
+          if [[ ! -f "${CONTRACT_FILE}" ]]; then
+            echo "Missing workload contract: ${CONTRACT_FILE}" >&2
+            exit 1
+          fi
+
+          export IAC_REPOSITORY IAC_REPOSITORY_ID
+          evidence_file="${RUNNER_TEMP}/release-evidence.json"
+          node scripts/verify-release.mjs \
+            "${payload_file}" \
+            "${CATALOG_FILE}" \
+            > "${evidence_file}"
+
+          node scripts/validate-contract.mjs \
+            "${CONTRACT_FILE}" \
+            "${CATALOG_FILE}" \
+            --caller-repository "$(jq -er '.sourceRepository' "${evidence_file}")" \
+            --caller-repository-id "$(jq -er '.sourceRepositoryId' "${evidence_file}")" \
+            --caller-repository-owner-id "$(jq -er '.sourceRepositoryOwnerId' "${evidence_file}")"
+
+          {
+            echo "evidence=$(jq -c '.' "${evidence_file}")"
+            echo "source-commit-sha=$(jq -er '.sourceCommitSha' "${evidence_file}")"
+            echo "image-digest=$(jq -er '.imageDigest' "${evidence_file}")"
+            echo "release-id=$(jq -er '.releaseId' "${evidence_file}")"
+            echo "release-tag=$(jq -er '.releaseTag' "${evidence_file}")"
+          } >> "${GITHUB_OUTPUT}"
+
+          {
+            echo '## Verified release evidence'
+            echo
+            jq -r '
+              "- Application: `\(.application)`",
+              "- Source repository: `\(.sourceRepository)` (`\(.sourceRepositoryId)`)",
+              "- Release: `\(.releaseTag)` / `\(.releaseId)`",
+              "- Source commit: `\(.sourceCommitSha)`",
+              "- Image: `\(.imageTag)`",
+              "- Digest: `\(.imageDigest)`",
+              "- Published: `\(.releasePublishedAt // "n/a (main channel)")`"
+            ' "${evidence_file}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  plan:
+    name: 02 / Planner preflight and what-if
+    needs: [resolve, verify-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production-plan
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out IaC default branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install pinned Bicep CLI
+        run: az bicep install --version v0.47.16
+
+      - name: Sign in as workload planner
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ needs.resolve.outputs.plan-client-id }}
+          tenant-id: ${{ needs.resolve.outputs.azure-tenant-id }}
+          subscription-id: ${{ needs.resolve.outputs.azure-subscription-id }}
+
+      - name: Write evidence and run preflight/what-if
+        env:
+          EVIDENCE_JSON: ${{ needs.verify-release.outputs.evidence }}
+          APPLICATION: ${{ needs.resolve.outputs.application }}
+          CONTRACT_FILE: ${{ needs.resolve.outputs.contract-file }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          evidence_file="${RUNNER_TEMP}/release-evidence.json"
+          printf '%s' "${EVIDENCE_JSON}" > "${evidence_file}"
+
+          {
+            echo "## ${APPLICATION} planner preflight"
+            echo
+            ./scripts/deploy-workload-release.sh \
+              preflight \
+              "${APPLICATION}" \
+              "${CATALOG_FILE}" \
+              "${CONTRACT_FILE}" \
+              "${evidence_file}"
+            echo
+            echo '## What-if'
+            echo
+            echo '```text'
+            ./scripts/deploy-workload-release.sh \
+              what-if \
+              "${APPLICATION}" \
+              "${CATALOG_FILE}" \
+              "${CONTRACT_FILE}" \
+              "${evidence_file}"
+            echo '```'
+          } | tee -a "${GITHUB_STEP_SUMMARY}"
+
+  deploy:
+    name: 03 / Protected production deploy
+    needs: [resolve, verify-release, plan]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+      deployments: write
+    outputs:
+      deployment-name: ${{ steps.apply.outputs.deployment-name }}
+      url: ${{ steps.verify_live.outputs.url }}
+    steps:
+      - name: Check out IaC default branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install pinned Bicep CLI
+        run: az bicep install --version v0.47.16
+
+      - name: Sign in as workload deployer
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ needs.resolve.outputs.deploy-client-id }}
+          tenant-id: ${{ needs.resolve.outputs.azure-tenant-id }}
+          subscription-id: ${{ needs.resolve.outputs.azure-subscription-id }}
+
+      - name: Re-verify release payload independently
+        id: reverify
+        env:
+          EVENT_PATH: ${{ github.event_path }}
+          SOURCE_GITHUB_TOKEN: ${{ secrets.SOURCE_GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          payload_file="${RUNNER_TEMP}/client-payload.json"
+          evidence_file="${RUNNER_TEMP}/release-evidence.json"
+          jq -e '.client_payload' "${EVENT_PATH}" > "${payload_file}"
+
+          export IAC_REPOSITORY IAC_REPOSITORY_ID
+          node scripts/verify-release.mjs \
+            "${payload_file}" \
+            "${CATALOG_FILE}" \
+            > "${evidence_file}"
+
+          planned_digest='${{ needs.verify-release.outputs.image-digest }}'
+          live_digest="$(jq -er '.imageDigest' "${evidence_file}")"
+          if [[ "${planned_digest}" != "${live_digest}" ]]; then
+            echo 'Release digest changed between plan and apply.' >&2
+            exit 1
+          fi
+
+          echo "evidence-path=${evidence_file}" >> "${GITHUB_OUTPUT}"
+
+      - name: Apply approved container app only
+        id: apply
+        env:
+          APPLICATION: ${{ needs.resolve.outputs.application }}
+          CONTRACT_FILE: ${{ needs.resolve.outputs.contract-file }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          evidence_file="${{ steps.reverify.outputs.evidence-path }}"
+          output_file="${RUNNER_TEMP}/apply.out"
+
+          ./scripts/deploy-workload-release.sh \
+            apply \
+            "${APPLICATION}" \
+            "${CATALOG_FILE}" \
+            "${CONTRACT_FILE}" \
+            "${evidence_file}" \
+            | tee "${output_file}"
+
+          deployment_name="$(sed -n 's/^deploymentName=//p' "${output_file}")"
+          if [[ -z "${deployment_name}" ]]; then
+            echo 'Apply output missing deploymentName' >&2
+            exit 1
+          fi
+          echo "deployment-name=${deployment_name}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify live revision and HTTP
+        id: verify_live
+        env:
+          APPLICATION: ${{ needs.resolve.outputs.application }}
+          CONTRACT_FILE: ${{ needs.resolve.outputs.contract-file }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          evidence_file="${{ steps.reverify.outputs.evidence-path }}"
+          output_file="${RUNNER_TEMP}/verify.out"
+
+          ./scripts/deploy-workload-release.sh \
+            verify \
+            "${APPLICATION}" \
+            "${CATALOG_FILE}" \
+            "${CONTRACT_FILE}" \
+            "${evidence_file}" \
+            | tee "${output_file}"
+
+          url="$(sed -n 's/^url=//p' "${output_file}")"
+          echo "url=${url}" >> "${GITHUB_OUTPUT}"
+
+      - name: Record GitHub deployment
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPLICATION: ${{ needs.resolve.outputs.application }}
+          RELEASE_TAG: ${{ needs.verify-release.outputs.release-tag }}
+          SOURCE_SHA: ${{ needs.verify-release.outputs.source-commit-sha }}
+          IMAGE_DIGEST: ${{ needs.verify-release.outputs.image-digest }}
+          DEPLOYMENT_NAME: ${{ steps.apply.outputs.deployment-name }}
+          LIVE_URL: ${{ steps.verify_live.outputs.url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          deployment_id="$(gh api \
+            --method POST \
+            -H 'Accept: application/vnd.github+json' \
+            "/repos/${IAC_REPOSITORY}/deployments" \
+            -f ref="${GITHUB_SHA}" \
+            -f environment='production' \
+            -f description="${APPLICATION} ${RELEASE_TAG}" \
+            -f auto_merge=false \
+            -F required_contexts='[]' \
+            -f payload="$(jq -n \
+              --arg application "${APPLICATION}" \
+              --arg releaseTag "${RELEASE_TAG}" \
+              --arg sourceSha "${SOURCE_SHA}" \
+              --arg digest "${IMAGE_DIGEST}" \
+              --arg deploymentName "${DEPLOYMENT_NAME}" \
+              '{application:$application,releaseTag:$releaseTag,sourceCommitSha:$sourceSha,imageDigest:$digest,azureDeploymentName:$deploymentName}')" \
+            --jq '.id' || true)"
+
+          if [[ -n "${deployment_id}" ]]; then
+            gh api \
+              --method POST \
+              -H 'Accept: application/vnd.github+json' \
+              "/repos/${IAC_REPOSITORY}/deployments/${deployment_id}/statuses" \
+              -f state='success' \
+              -f environment='production' \
+              -f environment_url="${LIVE_URL}" \
+              -f description="Verified ${APPLICATION} production deployment" \
+              >/dev/null || true
+          fi
+
+  summary:
+    name: 04 / Deployment summary
+    if: ${{ always() }}
+    needs: [resolve, verify-release, plan, deploy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Publish result
+        env:
+          APPLICATION: ${{ needs.resolve.outputs.application }}
+          VERIFY_RESULT: ${{ needs.verify-release.result }}
+          PLAN_RESULT: ${{ needs.plan.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          SOURCE_SHA: ${{ needs.verify-release.outputs.source-commit-sha }}
+          RELEASE_TAG: ${{ needs.verify-release.outputs.release-tag }}
+          RELEASE_ID: ${{ needs.verify-release.outputs.release-id }}
+          IMAGE_DIGEST: ${{ needs.verify-release.outputs.image-digest }}
+          DEPLOYMENT_NAME: ${{ needs.deploy.outputs.deployment-name }}
+          LIVE_URL: ${{ needs.deploy.outputs.url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          {
+            echo "## Single-container release deployment (${APPLICATION:-unknown})"
+            echo
+            echo "- IaC commit: \`${GITHUB_SHA}\`"
+            echo "- Source commit: \`${SOURCE_SHA}\`"
+            echo "- Release: \`${RELEASE_TAG}\` / \`${RELEASE_ID}\`"
+            echo "- Image digest: \`${IMAGE_DIGEST}\`"
+            echo "- Verify: \`${VERIFY_RESULT}\`"
+            echo "- Plan: \`${PLAN_RESULT}\`"
+            echo "- Deploy: \`${DEPLOY_RESULT}\`"
+            if [[ -n "${DEPLOYMENT_NAME}" ]]; then
+              echo "- Azure deployment: \`${DEPLOYMENT_NAME}\`"
+            fi
+            if [[ -n "${LIVE_URL}" ]]; then
+              echo "- Live URL: ${LIVE_URL}"
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          [[ "${VERIFY_RESULT}" == 'success' ]]
+          [[ "${PLAN_RESULT}" == 'success' ]]
+          [[ "${DEPLOY_RESULT}" == 'success' ]]

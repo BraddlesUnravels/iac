@@ -150,3 +150,68 @@ test('treats GitHub API failures as deployment blockers', async () => {
   assert.equal(result.valid, false);
   assert.match(result.errors.join('\n'), /Independent GitHub verification failed/);
 });
+
+
+test('accepts a verified main-channel payload', async () => {
+  const payload = {
+    ...validPayload,
+    releaseId: '99',
+    releaseTag: 'main',
+  };
+
+  const result = await verifyRelease({
+    payload,
+    catalog,
+    githubClient: async (url) => {
+      if (url.endsWith('/repos/BraddlesUnravels/qwik-website')) {
+        return {
+          id: 1367173842,
+          full_name: 'BraddlesUnravels/qwik-website',
+          owner: { id: 103235805 },
+        };
+      }
+      if (url.includes('/git/ref/heads/main')) {
+        return { object: { type: 'commit', sha: sourceSha } };
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    },
+  });
+
+  assert.equal(result.valid, true, result.errors.join('\n'));
+  assert.equal(result.evidence.releaseTag, 'main');
+  assert.equal(result.evidence.releasePublishedAt, null);
+});
+
+test('rejects main-channel payload when HEAD does not match source commit', async () => {
+  const payload = {
+    ...validPayload,
+    releaseId: '99',
+    releaseTag: 'main',
+  };
+
+  const result = await verifyRelease({
+    payload,
+    catalog,
+    githubClient: async (url) => {
+      if (url.endsWith('/repos/BraddlesUnravels/qwik-website')) {
+        return {
+          id: 1367173842,
+          full_name: 'BraddlesUnravels/qwik-website',
+          owner: { id: 103235805 },
+        };
+      }
+      if (url.includes('/git/ref/heads/main')) {
+        return {
+          object: {
+            type: 'commit',
+            sha: 'fedcba9876543210fedcba9876543210fedcba98',
+          },
+        };
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    },
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /main HEAD commit does not match/);
+});

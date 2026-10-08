@@ -7,11 +7,11 @@ identities, role assignments, Container Apps, or image access by itself.
 Workload operations (Qwik release path) are documented in
 [workloads/qwik-website-runbook.md](workloads/qwik-website-runbook.md).
 
-`access-control-demo` is catalogued in `environments/production.json` but is
-**not deployed from this repository yet**. Compute remains on its application-repo
-pipeline until the brownfield migration (next). Shared Key Vault belongs in
-`rg-platform-production` (final home) before Qwik cutover. Do not use platform
-scripts to change the access-control Container App.
+`access-control-demo` is catalogued and uses the generic single-container release
+workflow. Live compute may still be in `rg-access-control-demo` until foundation
+apply + DNS cutover finish. Shared Key Vault already lives in
+`rg-platform-production`. Do not use platform (ACR-only) scripts to change
+workload Container Apps.
 
 Last documentation pass: 2026-10-08.
 
@@ -148,4 +148,6 @@ teardown plan even while no images are required for platform health.
 - [../README.md](../README.md) — repository status and layout
 - [reusable-iac-design.md](reusable-iac-design.md) — architecture
 - [workloads/qwik-website-runbook.md](workloads/qwik-website-runbook.md) — Qwik foundation and release
+- [workloads/single-container-web-runbook.md](workloads/single-container-web-runbook.md) — generic single-container release path
+- [workloads/access-control-demo-runbook.md](workloads/access-control-demo-runbook.md) — access-control cutover
 - [../platform/README.md](../platform/README.md) — platform entry point
