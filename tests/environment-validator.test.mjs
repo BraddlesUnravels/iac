@@ -66,13 +66,21 @@ test('accepts the production catalog that includes qwik-website', async () => {
   assert.equal(result.valid, true, result.errors.join('\n'));
 });
 
-test('rejects a workload targeting the shared platform resource group', async () => {
+test('accepts workloads hosted in the shared platform resource group', async () => {
   const result = await validateEnvironment(
     await readFixture('environment.platform-rg-collision.json'),
   );
 
+  assert.equal(result.valid, true, result.errors.join('\n'));
+});
+
+test('rejects non-platform resource groups shared by multiple workloads', async () => {
+  const result = await validateEnvironment(
+    await readFixture('environment.duplicate-nonplatform-rg.json'),
+  );
+
   assert.equal(result.valid, false);
-  assert.match(result.errors.join('\n'), /shared platform resource group/);
+  assert.match(result.errors.join('\n'), /Duplicate resource group/);
 });
 
 test('rejects duplicate container app targets across workloads', async () => {

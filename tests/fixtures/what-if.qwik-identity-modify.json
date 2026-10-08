@@ -4,7 +4,7 @@
     "diagnostics": [],
     "changes": [
       {
-        "resourceId": "/subscriptions/eb1b0038-3a72-459d-884c-ba2820dc53cc/resourceGroups/rg-qwik-website-production/providers/Microsoft.App/containerApps/aca-qwik-website-production",
+        "resourceId": "/subscriptions/eb1b0038-3a72-459d-884c-ba2820dc53cc/resourceGroups/rg-platform-production/providers/Microsoft.App/containerApps/aca-qwik-website-production",
         "changeType": "Modify",
         "delta": [
           {

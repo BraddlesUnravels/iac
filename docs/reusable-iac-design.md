@@ -107,13 +107,18 @@ Keep distinct security lanes:
 Resource groups:
 
 ```text
-rg-platform-production          shared Basic ACR
-rg-qwik-website-production      Qwik foundation + app (managed here)
-rg-access-control-demo          existing app RG (adopt in place next; do not rename/move)
+rg-platform-production          shared ACR + Key Vault + Qwik (and later access-control)
+rg-access-control-demo          legacy compute only until brownfield migration
 ```
 
-The shared ACR uses ABAC repository permissions. Cross-resource-group ACR
-assignments belong to the foundation lane, never the routine deployment stack.
+Workloads may share `platformResourceGroup`. Non-platform resource groups remain
+unique per workload during migration. Foundations deploy **into** the existing
+platform RG; they do not create a separate app RG.
+
+The shared ACR uses ABAC repository permissions. ACR ABAC assignments belong to
+the foundation lane, never the routine deployment stack. Release what-if must
+never Create/Modify/Delete ACR or Key Vault resources even when they share the
+workload resource group.
 
 ## Repository shape (actual)
 

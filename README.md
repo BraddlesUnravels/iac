@@ -10,23 +10,29 @@ Coordinates such as subscription, tenant, and resource names in this repository
 are for a personal lab subscription used as a public portfolio. Treat them as
 examples of the contract model, not as shared production credentials.
 
-## Current status (2026-09-24)
+## Current status (2026-10-08)
 
 | Area | Status |
 | --- | --- |
 | Static validation (schemas, contracts, images, Bicep, ShellCheck, Checkov) | Implemented and enforced in CI |
-| Shared platform ACR (`rg-platform-production` / `braddlesunravelsacr`) | Deployed, verified, idempotent `what-if` |
-| Qwik website foundation + release path | Implemented; release-driven deploy via `deploy-qwik-release.yml` |
+| Shared platform RG (`rg-platform-production`) | Hosts ACR, shared Key Vault, and Qwik workload resources |
+| Shared platform ACR (`braddlesunravelsacr`) | Deployed, verified, idempotent `what-if` |
+| Qwik website foundation + release path | Implemented; foundation deploys into existing platform RG; release via `deploy-qwik-release.yml` |
 | Sticky custom domains for Qwik (`www` + apex) | Implemented in catalog, stack, and module |
-| `access-control-demo` | **Catalogued only — not deployed or migrated by this repository yet** |
+| `access-control-demo` | **Catalogued; compute still live in legacy RG until brownfield migration** |
 | Generic reusable `workflow_call` deploy/teardown | Not implemented (Qwik uses IaC-owned `repository_dispatch`) |
 | Prototype stacks (`next-supabase`, `qwik-elysia-postgres`) | Present for shape experiments; not production paths |
 
+**Consolidation:** Qwik and shared secrets target `rg-platform-production` only.
+Move `kv-acd-prod-braddles` into the platform RG before Qwik cutover so secrets
+are never left in a throwaway group. Delete `rg-qwik-website-production` only
+after verified DNS cutover.
+
 **Next migration:** adopt and deploy `access-control-demo` through this
-repository (brownfield foundation + Key Vault secret references + hosted
-Supabase migration job + parity checks). Until that work lands, the live
-access-control app continues to run on its existing application-repo workflow
-and is intentionally outside this IaC deploy surface.
+repository into the same platform RG (brownfield foundation + hosted Supabase
+migration job + parity checks). Until that work lands, the live access-control
+app continues on its application-repo workflow for compute, while the shared
+vault already lives in the platform RG.
 
 ## Architecture
 
@@ -53,15 +59,20 @@ Platform vs workload boundary:
 
 ```text
 rg-platform-production
-└── braddlesunravelsacr          # shared Basic ACR only
+├── braddlesunravelsacr                 # shared Basic ACR
+├── kv-acd-prod-braddles                # shared Key Vault (final home)
+├── Qwik foundation + app (this repo)
+│   ├── Log Analytics, ACA env, UAMIs, ABAC repo roles
+│   └── Container App + sticky custom domains
+└── (later) access-control resources
 
-rg-qwik-website-production       # Qwik foundation + app (this repo)
-├── Log Analytics, ACA env, UAMIs, ABAC repo roles
-└── Container App + sticky custom domains
-
-rg-access-control-demo           # existing live app (not yet managed here)
-└── still owned by the application deployment path until migration
+rg-access-control-demo                 # legacy compute only until migration
+└── still owned by the application deployment path for the app/env
 ```
+
+Deployer identities use a least-privilege custom role (Container App release
+surface only), not RG Contributor, because the platform RG also hosts ACR and
+Key Vault.
 
 Design detail: [docs/reusable-iac-design.md](docs/reusable-iac-design.md).  
 Platform ops: [docs/operations.md](docs/operations.md).  

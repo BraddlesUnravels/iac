@@ -65,7 +65,7 @@
       }
     },
     "qwik-website": {
-      "resourceGroup": "rg-platform-production",
+      "resourceGroup": "rg-access-control-demo",
       "stack": "single-container-web",
       "repository": "BraddlesUnravels/qwik-website",
       "repositoryId": "1367173842",
@@ -80,14 +80,16 @@
       "plannerIdentityName": "id-qwik-website-planner",
       "deployerIdentityName": "id-qwik-website-deployer",
       "customDomainName": "www.braddlesunravels.online",
-      "certificateResourceId": "/subscriptions/eb1b0038-3a72-459d-884c-ba2820dc53cc/resourceGroups/rg-platform-production/providers/Microsoft.App/managedEnvironments/acae-qwik-website-production/managedCertificates/mc-qwik-www-braddlesunravels-online",
+      "certificateResourceId": "/subscriptions/eb1b0038-3a72-459d-884c-ba2820dc53cc/resourceGroups/rg-access-control-demo/providers/Microsoft.App/managedEnvironments/acae-qwik-website-production/managedCertificates/mc-qwik-www",
       "additionalCustomDomains": [
         {
           "name": "braddlesunravels.online",
-          "certificateResourceId": "/subscriptions/eb1b0038-3a72-459d-884c-ba2820dc53cc/resourceGroups/rg-platform-production/providers/Microsoft.App/managedEnvironments/acae-qwik-website-production/managedCertificates/mc-qwik-apex-braddlesunravels-online"
+          "certificateResourceId": "/subscriptions/eb1b0038-3a72-459d-884c-ba2820dc53cc/resourceGroups/rg-access-control-demo/providers/Microsoft.App/managedEnvironments/acae-qwik-website-production/managedCertificates/mc-qwik-apex"
         }
       ],
-      "allowedSecretNames": ["qwik-demo-general-access-code"],
+      "allowedSecretNames": [
+        "qwik-demo-general-access-code"
+      ],
       "migrationSecretNames": [],
       "externalEnvironmentVariables": [],
       "bounds": {

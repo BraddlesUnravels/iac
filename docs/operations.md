@@ -8,11 +8,12 @@ Workload operations (Qwik release path) are documented in
 [workloads/qwik-website-runbook.md](workloads/qwik-website-runbook.md).
 
 `access-control-demo` is catalogued in `environments/production.json` but is
-**not deployed from this repository yet**. It remains on its application-repo
-pipeline until the brownfield migration (next). Do not use platform scripts to
-change that workload.
+**not deployed from this repository yet**. Compute remains on its application-repo
+pipeline until the brownfield migration (next). Shared Key Vault belongs in
+`rg-platform-production` (final home) before Qwik cutover. Do not use platform
+scripts to change the access-control Container App.
 
-Last documentation pass: 2026-09-24.
+Last documentation pass: 2026-10-08.
 
 ## Current live platform state
 

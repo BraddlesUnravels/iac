@@ -3,7 +3,7 @@ targetScope = 'subscription'
 @description('Azure region.')
 param location string
 
-@description('Application resource group name.')
+@description('Existing resource group that hosts this workload (platform RG).')
 param resourceGroupName string
 
 @description('Deployment environment name.')
@@ -65,10 +65,9 @@ var tags = union(additionalTags, mandatoryTags)
 var repositoryReaderRoleId = 'b93aa761-3e63-49ed-ac28-beffa264f7ac'
 var repositoryWriterRoleId = '2a1e307c-b015-4ebd-883e-5b7698a07328'
 
-resource appResourceGroup 'Microsoft.Resources/resourceGroups@2025-04-01' = {
+// Workloads share the existing platform resource group. Do not create a new RG.
+resource appResourceGroup 'Microsoft.Resources/resourceGroups@2025-04-01' existing = {
   name: resourceGroupName
-  location: location
-  tags: tags
 }
 
 module resources 'resources.bicep' = {

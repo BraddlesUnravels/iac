@@ -42,7 +42,24 @@ test('rejects identity modification', async () => {
 test('rejects unrelated registry changes', async () => {
   const result = await validateFixture('what-if.qwik-unrelated.json');
   assert.equal(result.valid, false);
-  assert.match(result.errors.join('\n'), /unapproved resource/);
+  assert.match(result.errors.join('\n'), /shared platform resource|unapproved resource/);
+});
+
+test('rejects Key Vault mutations even inside the shared platform RG', async () => {
+  const catalog = JSON.parse(await readFile(catalogPath, 'utf8'));
+  const result = validateWorkloadWhatIf({
+    catalog,
+    application: 'qwik-website',
+    whatIfResult: {
+      status: 'Succeeded',
+      changes: [{
+        resourceId: `/subscriptions/${catalog.azure.subscriptionId}/resourceGroups/${catalog.workloads['qwik-website'].resourceGroup}/providers/Microsoft.KeyVault/vaults/kv-acd-prod-braddles`,
+        changeType: 'Modify',
+      }],
+    },
+  });
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /shared platform resource/);
 });
 
 test('accepts Key Vault secret reference changes for workloads with approved secrets', async () => {
