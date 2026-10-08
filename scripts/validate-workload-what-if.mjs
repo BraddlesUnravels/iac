@@ -96,11 +96,13 @@ export const validateWorkloadWhatIf = ({
   ]);
 
   // Shared platform resources may live in the same RG as the workload. Release
-  // what-if must never mutate them, including Ignore-only noise from ACR/KV.
-  const forbiddenSharedTypeFragments = [
+  // what-if must never Create/Modify/Delete them. Azure often emits Ignore or
+  // NoChange noise for ACR/KV referenced by secret refs or registry auth.
+  const sharedPlatformTypeFragments = [
     '/providers/microsoft.containerregistry/',
     '/providers/microsoft.keyvault/',
   ];
+  const sharedPlatformNoiseChangeTypes = new Set(['Ignore', 'NoChange']);
 
   const normalizedChanges = [];
 
@@ -115,7 +117,11 @@ export const validateWorkloadWhatIf = ({
 
     const normalizedId = normalizeResourceId(resourceId);
 
-    if (forbiddenSharedTypeFragments.some((fragment) => normalizedId.includes(fragment))) {
+    if (sharedPlatformTypeFragments.some((fragment) => normalizedId.includes(fragment))) {
+      if (sharedPlatformNoiseChangeTypes.has(changeType)) {
+        continue;
+      }
+
       errors.push(`What-if targets a shared platform resource: ${resourceId}`);
       continue;
     }

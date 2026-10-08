@@ -137,6 +137,43 @@ test('Ignore never permits a skipped app or a different workload scope', async (
   }
 });
 
+
+test('accepts Ignore and NoChange noise for shared ACR and Key Vault', async () => {
+  const catalog = JSON.parse(await readFile(catalogPath, 'utf8'));
+  const rg = catalog.workloads['qwik-website'].resourceGroup;
+  const sub = catalog.azure.subscriptionId;
+  const sharedIds = [
+    `/subscriptions/${sub}/resourceGroups/${rg}/providers/Microsoft.ContainerRegistry/registries/braddlesunravelsacr`,
+    `/subscriptions/${sub}/resourceGroups/${rg}/providers/Microsoft.KeyVault/vaults/kv-acd-prod-braddles`,
+  ];
+
+  for (const changeType of ['Ignore', 'NoChange']) {
+    const result = validateWorkloadWhatIf({
+      catalog,
+      application: 'qwik-website',
+      whatIfResult: {
+        status: 'Succeeded',
+        changes: sharedIds.map((resourceId) => ({ resourceId, changeType })),
+      },
+    });
+    assert.equal(result.valid, true, result.errors.join('\n'));
+    assert.deepEqual(result.changes, []);
+  }
+
+  for (const changeType of ['Create', 'Modify', 'Delete']) {
+    const rejected = validateWorkloadWhatIf({
+      catalog,
+      application: 'qwik-website',
+      whatIfResult: {
+        status: 'Succeeded',
+        changes: [{ resourceId: sharedIds[0], changeType }],
+      },
+    });
+    assert.equal(rejected.valid, false, `Shared ACR ${changeType} must remain blocked`);
+    assert.match(rejected.errors.join('\n'), /shared platform resource/);
+  }
+});
+
 test('nested deployments must use the exact workload resource group boundary', async () => {
   const catalog = JSON.parse(await readFile(catalogPath, 'utf8'));
   const workload = catalog.workloads['qwik-website'];
