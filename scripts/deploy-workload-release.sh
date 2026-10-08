@@ -284,8 +284,10 @@ run_verify() {
     exit 1
   fi
 
-  custom_domain="$(jq -er --arg app "${APPLICATION}" '.workloads[$app].customDomainName // empty' "${CATALOG_FILE}")"
-  certificate_id="$(jq -er --arg app "${APPLICATION}" '.workloads[$app].certificateResourceId // empty' "${CATALOG_FILE}")"
+  # Optional catalog fields may be null before cert/DNS cutover. jq -e treats
+  # empty string as failure (exit 4), so use plain -r here.
+  custom_domain="$(jq -r --arg app "${APPLICATION}" '.workloads[$app].customDomainName // empty' "${CATALOG_FILE}")"
+  certificate_id="$(jq -r --arg app "${APPLICATION}" '.workloads[$app].certificateResourceId // empty' "${CATALOG_FILE}")"
   fqdn="$(jq -er '.properties.configuration.ingress.fqdn' <<<"${app_json}")"
 
   if [[ -n "${custom_domain}" ]]; then
