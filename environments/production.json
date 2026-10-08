@@ -15,7 +15,7 @@
     "access-control-demo": {
       "resourceGroup": "rg-platform-production",
       "stack": "single-container-web",
-      "repository": "braddlesunravels/access-control-demo",
+      "repository": "BraddlesUnravels/access-control-demo",
       "repositoryId": "1298659298",
       "repositoryOwnerId": "103235805",
       "containerRepository": "access-control-demo",
