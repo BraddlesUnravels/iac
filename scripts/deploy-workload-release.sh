@@ -8,11 +8,11 @@ CATALOG_FILE="${3:-}"
 CONTRACT_FILE="${4:-}"
 EVIDENCE_FILE="${5:-}"
 EXPECTED_BICEP_VERSION='0.47.16'
-FIXED_APPLICATION='qwik-website'
+SUPPORTED_STACK='single-container-web'
 FIXED_STACK_TEMPLATE="${ROOT_DIR}/stacks/single-container-web/main.bicep"
 
 usage() {
-  echo "Usage: $0 <preflight|what-if|apply|verify> qwik-website <environment.json> <workload.json> <evidence.json>" >&2
+  echo "Usage: $0 <preflight|what-if|apply|verify> <application> <environment.json> <workload.json> <evidence.json>" >&2
 }
 
 require_command() {
@@ -28,13 +28,13 @@ if [[ "${OPERATION}" != 'preflight' && "${OPERATION}" != 'what-if' && "${OPERATI
   exit 1
 fi
 
-if [[ "${APPLICATION}" != "${FIXED_APPLICATION}" ]]; then
-  echo "Only ${FIXED_APPLICATION} is supported by this orchestrator." >&2
+if [[ -z "${APPLICATION}" || -z "${CATALOG_FILE}" || -z "${CONTRACT_FILE}" || -z "${EVIDENCE_FILE}" ]]; then
+  usage
   exit 1
 fi
 
-if [[ -z "${CATALOG_FILE}" || -z "${CONTRACT_FILE}" || -z "${EVIDENCE_FILE}" ]]; then
-  usage
+if [[ ! "${APPLICATION}" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+  echo "Invalid application id: ${APPLICATION}" >&2
   exit 1
 fi
 
@@ -51,6 +51,28 @@ require_command node
 require_command curl
 
 node "${ROOT_DIR}/scripts/validate-environment.mjs" "${CATALOG_FILE}"
+
+stack_name="$(jq -er --arg app "${APPLICATION}" '.workloads[$app].stack // empty' "${CATALOG_FILE}")"
+if [[ -z "${stack_name}" ]]; then
+  echo "Application ${APPLICATION} is not present in the environment catalog." >&2
+  exit 1
+fi
+if [[ "${stack_name}" != "${SUPPORTED_STACK}" ]]; then
+  echo "Application ${APPLICATION} uses stack ${stack_name}; only ${SUPPORTED_STACK} is supported." >&2
+  exit 1
+fi
+
+contract_application="$(jq -er '.application' "${CONTRACT_FILE}")"
+contract_stack="$(jq -er '.stack' "${CONTRACT_FILE}")"
+if [[ "${contract_application}" != "${APPLICATION}" ]]; then
+  echo "Contract application ${contract_application} does not match ${APPLICATION}." >&2
+  exit 1
+fi
+if [[ "${contract_stack}" != "${SUPPORTED_STACK}" ]]; then
+  echo "Contract stack ${contract_stack} is not ${SUPPORTED_STACK}." >&2
+  exit 1
+fi
+
 
 subscription_id="$(jq -er '.azure.subscriptionId' "${CATALOG_FILE}")"
 tenant_id="$(jq -er '.azure.tenantId' "${CATALOG_FILE}")"
@@ -183,7 +205,7 @@ run_preflight() {
 
 run_what_if() {
   resolve_and_render what-if
-  deployment_name="qwik-${source_sha:0:8}-$(date -u +%Y%m%d%H%M%S)"
+  deployment_name="${APPLICATION:0:20}-${source_sha:0:8}-$(date -u +%Y%m%d%H%M%S)"
 
   az deployment group what-if \
     --name "${deployment_name}" \
@@ -214,7 +236,7 @@ run_what_if() {
 
 run_apply() {
   resolve_and_render apply
-  deployment_name="qwik-${source_sha:0:8}-$(date -u +%Y%m%d%H%M%S)"
+  deployment_name="${APPLICATION:0:20}-${source_sha:0:8}-$(date -u +%Y%m%d%H%M%S)"
 
   az deployment group what-if \
     --name "${deployment_name}" \
@@ -321,37 +343,48 @@ run_verify() {
     url="https://${fqdn}"
   fi
 
+  health_path="$(jq -er '.container.healthProbePath' "${CONTRACT_FILE}")"
+  if [[ ! "${health_path}" =~ ^/ ]]; then
+    echo "Health probe path must be absolute: ${health_path}" >&2
+    exit 1
+  fi
+
+  health_url="${url}${health_path}"
   ready=0
   for _ in $(seq 1 30); do
-    if curl --fail --silent --show-error --max-time 10 "${url}/health" >/tmp/qwik-live-health; then
-      if [[ "$(cat /tmp/qwik-live-health)" == 'ok' ]]; then
-        ready=1
-        break
-      fi
+    health_code="$(curl -sS -o /tmp/scw-live-health -w '%{http_code}' --max-time 10 "${health_url}" || true)"
+    if [[ "${health_code}" == '200' ]]; then
+      ready=1
+      break
     fi
     sleep 5
   done
 
   if [[ "${ready}" -ne 1 ]]; then
-    echo 'Live /health verification failed.' >&2
+    echo "Live health verification failed for ${health_url}" >&2
+    cat /tmp/scw-live-health >&2 || true
     exit 1
   fi
 
-  homepage_code="$(curl -sS -o /tmp/qwik-live-home -w '%{http_code}' "${url}/")"
-  if [[ "${homepage_code}" != '200' ]]; then
-    echo "Homepage expected 200, got ${homepage_code}" >&2
-    exit 1
-  fi
+  # Qwik keeps a couple of extra smoke routes; other apps only need health.
+  if [[ "${APPLICATION}" == 'qwik-website' ]]; then
+    homepage_code="$(curl -sS -o /tmp/scw-live-home -w '%{http_code}' "${url}/")"
+    if [[ "${homepage_code}" != '200' ]]; then
+      echo "Homepage expected 200, got ${homepage_code}" >&2
+      exit 1
+    fi
 
-  # Qwik City case-study routes are trailing-slash canonical.
-  study_code="$(curl -sS -o /tmp/qwik-live-study -w '%{http_code}' "${url}/work/access-control-demo/")"
-  if [[ "${study_code}" != '200' ]]; then
-    echo "Case study expected 200, got ${study_code}" >&2
-    exit 1
+    # Qwik City case-study routes are trailing-slash canonical.
+    study_code="$(curl -sS -o /tmp/scw-live-study -w '%{http_code}' "${url}/work/access-control-demo/")"
+    if [[ "${study_code}" != '200' ]]; then
+      echo "Case study expected 200, got ${study_code}" >&2
+      exit 1
+    fi
   fi
 
   printf 'url=%s\n' "${url}"
   printf 'image=%s\n' "${configured_image}"
+  printf 'healthPath=%s\n' "${health_path}"
   printf 'health=ok\n'
   if [[ -n "${custom_domain}" ]]; then
     printf 'customDomain=%s\n' "${custom_domain}"
