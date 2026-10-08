@@ -165,7 +165,9 @@ export const verifyRelease = async ({
     errors.push('Payload environment does not match catalog');
   }
 
-  if (payload.sourceRepository !== workload.repository) {
+  if (
+    payload.sourceRepository.toLowerCase() !== workload.repository.toLowerCase()
+  ) {
     errors.push(`sourceRepository must equal ${workload.repository}`);
   }
 
