@@ -26,6 +26,6 @@
     "NEXT_SUPABASE_URL": "next-supabase-url"
   },
   "customDomain": {
-    "enabled": false
+    "enabled": true
   }
 }
