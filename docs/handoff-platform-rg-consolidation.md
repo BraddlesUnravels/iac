@@ -65,7 +65,7 @@ rg-qwik-website-production       ← DELETED
 - Registrar / DNS: **GoDaddy** (`ns27` / `ns28.domaincontrol.com`)
 - **www** CNAME → `aca-qwik-website-production.wonderfulsmoke-320e8626.australiaeast.azurecontainerapps.io`
 - **apex A `@`** → new env static IP (`4.200.97.130` at cutover time; re-read from Azure if needed)
-- **aca** CNAME → access-control (leave alone): `aca-access-control-demo.happybay-…`
+- **aca** CNAME → platform access-control: `aca-access-control-demo.greenwave-bd9d2bee.australiaeast.azurecontainerapps.io`
 - **asuid** / **asuid.www** TXT → Qwik custom domain verification id (platform app)
 - TTL was 12h on several records; prefer `@ns27.domaincontrol.com` or `8.8.8.8` when checking propagation (local caches can lag)
 
@@ -74,7 +74,7 @@ rg-qwik-website-production       ← DELETED
 | Resource group | State | Role |
 | --- | --- | --- |
 | `rg-platform-production` | Succeeded | ACR, KV, full Qwik stack |
-| `rg-access-control-demo` | Succeeded | access-control compute + its own certs/identities (legacy) |
+| `rg-access-control-demo` | **Gone** | — |
 | `rg-qwik-website-production` | **Gone** | — |
 
 ### Platform RG contents (Qwik + shared)
@@ -97,7 +97,7 @@ rg-qwik-website-production       ← DELETED
 | Qwik default FQDN suffix | `wonderfulsmoke-320e8626.australiaeast.azurecontainerapps.io` |
 | Qwik primary host | `www.braddlesunravels.online` |
 | Qwik apex | `braddlesunravels.online` |
-| access-control host | `aca.braddlesunravels.online` (still old RG) |
+| access-control host | `aca.braddlesunravels.online` (platform RG) |
 | Shared vault | `kv-acd-prod-braddles` in **platform** RG |
 
 Immutable OIDC subjects (unchanged pattern; client IDs were rotated when UAMIs were recreated — trust GitHub env vars as source of truth):
@@ -108,12 +108,11 @@ Immutable OIDC subjects (unchanged pattern; client IDs were rotated when UAMIs w
 
 ---
 
-## Explicitly out of scope for the completed phase (still true)
+## Explicitly out of scope going forward
 
-- Deleting `rg-access-control-demo`
-- Moving access-control compute into `rg-platform-production`
-- Switching access-control from GHCR + app-repo `production.yml` to IaC dispatch + shared ACR
-- Generic multi-app `workflow_call` deploy workflow
+- Further platform RG RBAC narrowing / subscription policy cleanup
+- Auto-deploy on every push to main
+- Moving Supabase migration execution into IaC
 
 ---
 
@@ -171,13 +170,13 @@ Design constraints to preserve:
 - [x] Validators/docs describe single-platform-RG sharing for workloads
 - [x] access-control still up in legacy compute RG; vault already final
 
-### Next phase (access-control) — not started
+### Access-control phase — met (2026-10-08)
 
-- [ ] access-control compute in `rg-platform-production`
-- [ ] access-control image/release via shared ACR + IaC dispatch
-- [ ] `aca.braddlesunravels.online` on platform-hosted app
-- [ ] `rg-access-control-demo` deleted
-- [ ] Catalog/runbook only describe platform RG for both apps
+- [x] access-control compute in `rg-platform-production`
+- [x] access-control image/release via shared ACR + IaC dispatch
+- [x] `aca.braddlesunravels.online` on platform-hosted app
+- [x] `rg-access-control-demo` deleted
+- [x] Catalog/runbook describe platform RG + generic single-container path for both apps
 
 ---
 
