@@ -44,6 +44,7 @@ resource deployerRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
           'Microsoft.Resources/deployments/validate/action'
           'Microsoft.Resources/deployments/whatIf/action'
           'Microsoft.Resources/deployments/operations/read'
+          'Microsoft.Resources/deployments/operationStatuses/read'
           'Microsoft.Resources/subscriptions/resourcegroups/read'
           'Microsoft.App/containerApps/read'
           'Microsoft.App/containerApps/write'
