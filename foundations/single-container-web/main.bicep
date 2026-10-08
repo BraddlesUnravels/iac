@@ -65,13 +65,16 @@ var tags = union(additionalTags, mandatoryTags)
 var repositoryReaderRoleId = 'b93aa761-3e63-49ed-ac28-beffa264f7ac'
 var repositoryWriterRoleId = '2a1e307c-b015-4ebd-883e-5b7698a07328'
 
+// Keep historical Qwik name seeds so foundation re-apply stays idempotent.
+var roleNameSeedPrefix = application == 'qwik-website' ? 'qwik' : application
+
 // Workloads share the existing platform resource group. Do not create a new RG.
 resource appResourceGroup 'Microsoft.Resources/resourceGroups@2025-04-01' existing = {
   name: resourceGroupName
 }
 
 module resources 'resources.bicep' = {
-  name: 'qwik-foundation-resources'
+  name: '${application}-foundation-resources'
   scope: appResourceGroup
   params: {
     location: location
@@ -133,7 +136,7 @@ module pullReader '../../modules/role-assignment/acr-abac-repository.bicep' = {
     repositoryName: containerRepositoryName
     roleKind: 'Reader'
     roleDefinitionId: repositoryReaderRoleId
-    nameSeed: 'qwik-pull'
+    nameSeed: '${roleNameSeedPrefix}-pull'
   }
 }
 
@@ -146,7 +149,7 @@ module plannerReader '../../modules/role-assignment/acr-abac-repository.bicep' =
     repositoryName: containerRepositoryName
     roleKind: 'Reader'
     roleDefinitionId: repositoryReaderRoleId
-    nameSeed: 'qwik-planner'
+    nameSeed: '${roleNameSeedPrefix}-planner'
   }
 }
 
@@ -159,7 +162,7 @@ module publisherWriter '../../modules/role-assignment/acr-abac-repository.bicep'
     repositoryName: containerRepositoryName
     roleKind: 'Writer'
     roleDefinitionId: repositoryWriterRoleId
-    nameSeed: 'qwik-publisher'
+    nameSeed: '${roleNameSeedPrefix}-publisher'
   }
 }
 
@@ -173,7 +176,7 @@ module deployerRepoReader '../../modules/role-assignment/acr-abac-repository.bic
     repositoryName: containerRepositoryName
     roleKind: 'Reader'
     roleDefinitionId: repositoryReaderRoleId
-    nameSeed: 'qwik-deployer'
+    nameSeed: '${roleNameSeedPrefix}-deployer'
   }
 }
 
@@ -183,7 +186,7 @@ module plannerAcrReader '../../modules/role-assignment/acr-registry-reader.bicep
   params: {
     containerRegistryName: containerRegistryName
     principalId: resources.outputs.plannerIdentityPrincipalId
-    nameSeed: 'qwik-planner'
+    nameSeed: '${roleNameSeedPrefix}-planner'
   }
 }
 
@@ -193,7 +196,7 @@ module deployerAcrReader '../../modules/role-assignment/acr-registry-reader.bice
   params: {
     containerRegistryName: containerRegistryName
     principalId: resources.outputs.deployerIdentityPrincipalId
-    nameSeed: 'qwik-deployer'
+    nameSeed: '${roleNameSeedPrefix}-deployer'
   }
 }
 

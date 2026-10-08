@@ -214,7 +214,7 @@ test('rejects unapproved qwik secret environment variable names', async () => {
   const result = await validateContract(contract, qwikCatalog, qwikCaller);
 
   assert.equal(result.valid, false);
-  assert.match(result.errors.join('\n'), /Secret environment variable ORIGIN is not approved/);
+  assert.match(result.errors.join('\n'), /Secret environment variable ORIGIN is not approved for this application/);
 });
 
 test('rejects qwik contract missing a required environment variable', async () => {

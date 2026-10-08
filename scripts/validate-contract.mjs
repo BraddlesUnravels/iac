@@ -9,8 +9,10 @@ import { loadAndValidateEnvironment } from './validate-environment.mjs';
 
 const schemaUrl = new URL('../schemas/workload.schema.json', import.meta.url);
 
-const productionStackPolicies = {
+// Production policy is application-aware on the shared single-container-web stack.
+const productionApplicationPolicies = {
   'access-control-demo': {
+    stack: 'single-container-web',
     environment: {
       ACCESS_GATE_DISABLED: 'false',
       HOSTNAME: '0.0.0.0',
@@ -19,23 +21,29 @@ const productionStackPolicies = {
       PORT: '3000',
     },
     requireEmptySecretRefs: false,
+    allowedSecretEnvironmentNames: [
+      'ACCESS_GATE_CODE_SECRET',
+      'ACCESS_GATE_COOKIE_SECRET',
+      'NEXT_SUPABASE_PUBLISHABLE_KEY',
+      'NEXT_SUPABASE_URL',
+    ],
     requireCustomDomainDisabled: false,
   },
-  'single-container-web': {
+  'qwik-website': {
+    stack: 'single-container-web',
     environment: {
       NODE_ENV: 'production',
       PORT: '3000',
       HOST: '0.0.0.0',
     },
     requireEmptySecretRefs: false,
-    // Optional app-specific variables; any other name is rejected.
     optionalEnvironmentNames: ['ACA_DEMO_DOMAIN', 'ACA_DEMO_ACCESS_LINK'],
-    // Secret-backed env names; secret names themselves come from the catalog allowlist.
     allowedSecretEnvironmentNames: ['ACA_GENERAL_ACCESS_CODE'],
-    // Hostname is catalog-owned and injected as AZURE_CUSTOM_DOMAIN by the stack.
     requireCustomDomainDisabled: false,
   },
 };
+
+const productionSupportedStacks = new Set(['single-container-web']);
 
 const reservedInfrastructureEnvNames = new Set(['AZURE_CUSTOM_DOMAIN']);
 
@@ -126,7 +134,7 @@ export const validateContract = async (
 
   if (
     contract.environment === 'production' &&
-    !productionStackPolicies[contract.stack]
+    !productionSupportedStacks.has(contract.stack)
   ) {
     errors.push(`Stack ${contract.stack} is not supported in production`);
   }
@@ -146,53 +154,63 @@ export const validateContract = async (
     errors.push(`Caller repository owner ID must equal ${workload.repositoryOwnerId}`);
   }
 
-  const policy = productionStackPolicies[contract.stack];
+  const policy = productionApplicationPolicies[contract.application];
 
-  if (contract.environment === 'production' && policy) {
-    const requestedNames = new Set(Object.keys(contract.env));
-    const approvedNames = new Set(Object.keys(policy.environment));
-    const optionalNames = new Set(policy.optionalEnvironmentNames ?? []);
-    const requiredNamesPresent = [...approvedNames].every((name) =>
-      requestedNames.has(name),
-    );
-    const unexpectedNames = [...requestedNames].filter(
-      (name) => !approvedNames.has(name) && !optionalNames.has(name),
-    );
-
-    if (!requiredNamesPresent || unexpectedNames.length > 0) {
-      const optionalSuffix =
-        optionalNames.size > 0
-          ? ` (optional: ${[...optionalNames].sort().join(', ')})`
-          : '';
+  if (contract.environment === 'production') {
+    if (!policy) {
       errors.push(
-        `Environment variables must exactly match: ${[...approvedNames].sort().join(', ')}${optionalSuffix}`,
+        `Application ${contract.application} has no production contract policy`,
       );
-    }
+    } else if (policy.stack !== contract.stack) {
+      errors.push(
+        `Application ${contract.application} must use stack ${policy.stack}`,
+      );
+    } else {
+      const requestedNames = new Set(Object.keys(contract.env));
+      const approvedNames = new Set(Object.keys(policy.environment));
+      const optionalNames = new Set(policy.optionalEnvironmentNames ?? []);
+      const requiredNamesPresent = [...approvedNames].every((name) =>
+        requestedNames.has(name),
+      );
+      const unexpectedNames = [...requestedNames].filter(
+        (name) => !approvedNames.has(name) && !optionalNames.has(name),
+      );
 
-    for (const [name, expectedValue] of Object.entries(policy.environment)) {
-      if (contract.env[name] !== expectedValue) {
-        errors.push(`${name} must equal ${expectedValue}`);
+      if (!requiredNamesPresent || unexpectedNames.length > 0) {
+        const optionalSuffix =
+          optionalNames.size > 0
+            ? ` (optional: ${[...optionalNames].sort().join(', ')})`
+            : '';
+        errors.push(
+          `Environment variables must exactly match: ${[...approvedNames].sort().join(', ')}${optionalSuffix}`,
+        );
       }
-    }
 
-    if (policy.requireEmptySecretRefs) {
-      if (Object.keys(contract.secretRefs).length > 0) {
-        errors.push('Secret references must be empty for this stack');
-      }
-    } else if (policy.allowedSecretEnvironmentNames) {
-      const allowedSecretEnvNames = new Set(policy.allowedSecretEnvironmentNames);
-
-      for (const name of Object.keys(contract.secretRefs)) {
-        if (!allowedSecretEnvNames.has(name)) {
-          errors.push(
-            `Secret environment variable ${name} is not approved for this stack`,
-          );
+      for (const [name, expectedValue] of Object.entries(policy.environment)) {
+        if (contract.env[name] !== expectedValue) {
+          errors.push(`${name} must equal ${expectedValue}`);
         }
       }
-    }
 
-    if (policy.requireCustomDomainDisabled && contract.customDomain.enabled) {
-      errors.push('Custom domain must be disabled for this stack');
+      if (policy.requireEmptySecretRefs) {
+        if (Object.keys(contract.secretRefs).length > 0) {
+          errors.push('Secret references must be empty for this application');
+        }
+      } else if (policy.allowedSecretEnvironmentNames) {
+        const allowedSecretEnvNames = new Set(policy.allowedSecretEnvironmentNames);
+
+        for (const name of Object.keys(contract.secretRefs)) {
+          if (!allowedSecretEnvNames.has(name)) {
+            errors.push(
+              `Secret environment variable ${name} is not approved for this application`,
+            );
+          }
+        }
+      }
+
+      if (policy.requireCustomDomainDisabled && contract.customDomain.enabled) {
+        errors.push('Custom domain must be disabled for this application');
+      }
     }
   }
 
