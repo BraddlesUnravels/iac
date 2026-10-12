@@ -13,7 +13,7 @@ const validateFixture = (name, options = {}) =>
     ...options,
   });
 
-test('accepts creation of only the approved resource group and ACR', async () => {
+test('should accept creation of only the approved resource group and ACR', async () => {
   const result = await validateFixture('what-if.safe-create.json');
 
   assert.equal(result.valid, true, result.errors.join('\n'));
@@ -21,20 +21,20 @@ test('accepts creation of only the approved resource group and ACR', async () =>
   assert.equal(result.requiresModifyApproval, false);
 });
 
-test('accepts the live Azure CLI what-if envelope', async () => {
+test('should accept the live Azure CLI what-if envelope', async () => {
   const result = await validateFixture('what-if.live-cli-create.json');
 
   assert.equal(result.valid, true, result.errors.join('\n'));
   assert.equal(result.changes.length, 2);
 });
 
-test('accepts an idempotent result', async () => {
+test('should accept an idempotent result', async () => {
   const result = await validateFixture('what-if.safe-idempotent.json');
 
   assert.equal(result.valid, true, result.errors.join('\n'));
 });
 
-test('requires explicit approval for an allowed-resource modification', async () => {
+test('should require explicit approval for an allowed-resource modification', async () => {
   const unapprovedResult = await validateFixture('what-if.allowed-modify.json');
   const approvedResult = await validateFixture('what-if.allowed-modify.json', {
     allowModify: true,
@@ -55,7 +55,7 @@ const unsafeFixtures = [
 ];
 
 for (const [fixture, messagePattern] of unsafeFixtures) {
-  test(`rejects ${fixture}`, async () => {
+  test(`should reject ${fixture}`, async () => {
     const result = await validateFixture(fixture);
 
     assert.equal(result.valid, false);

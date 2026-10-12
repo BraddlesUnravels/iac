@@ -10,14 +10,14 @@ const planner = permission([
   'Microsoft.Resources/deployments/whatIf/action',
 ]);
 
-test('Reader alone fails with an actionable scoped planner repair', () => {
+test('should fail with an actionable scoped planner repair when Reader alone is used', () => {
   assert.throws(
     () => validateDeploymentPermissions({ value: [permission(['*/read'])] }, 'preflight'),
     /whatIf\/action[\s\S]*deployment-planner\.bicep[\s\S]*do not grant Contributor/,
   );
 });
 
-test('Reader plus the custom role allows planning without resource write', () => {
+test('should allow planning without resource write when Reader plus the custom role is present', () => {
   for (const operation of ['preflight', 'what-if']) {
     validateDeploymentPermissions({ value: [permission(['*/read']), planner] }, operation);
   }
@@ -27,19 +27,19 @@ test('Reader plus the custom role allows planning without resource write', () =>
   );
 });
 
-test('Contributor permits protected apply despite its IAM exclusions', () => {
+test('should permit protected apply with Contributor despite its IAM exclusions', () => {
   validateDeploymentPermissions({
     value: [permission(['*'], ['Microsoft.Authorization/*/write', 'Microsoft.Authorization/*/delete'])],
   }, 'apply');
 });
 
-test('NotActions only subtracts permissions from the same role, not other roles', () => {
+test('should only subtract NotActions permissions from the same role, not other roles', () => {
   const excluded = permission(['*'], ['Microsoft.Resources/deployments/whatIf/action']);
   assert.throws(() => validateDeploymentPermissions({ value: [excluded] }, 'what-if'), /whatIf\/action/);
   validateDeploymentPermissions({ value: [excluded, planner] }, 'what-if');
 });
 
-test('action matching is case-insensitive and requires the full action', () => {
+test('should match actions case-insensitively and require the full action', () => {
   validateDeploymentPermissions({ value: [permission(['microsoft.resources/DEPLOYMENTS/*'])] }, 'what-if');
   assert.throws(
     () => validateDeploymentPermissions({ value: [permission(['Microsoft.Resources/deployments/whatIf/actionExtra'])] }, 'what-if'),
@@ -47,7 +47,7 @@ test('action matching is case-insensitive and requires the full action', () => {
   );
 });
 
-test('missing, malformed, empty and incomplete permission responses fail closed', () => {
+test('should fail closed for missing, malformed, empty and incomplete permission responses', () => {
   for (const response of [
     null, {}, { value: [] }, { value: [permission(['*'])], nextLink: 'next-page' },
     { value: [{}] }, { value: [permission([null])] },

@@ -7,15 +7,16 @@
 > **Authoritative status:** root [README](../../README.md) and
 > [reusable-iac-design.md](../reusable-iac-design.md).
 >
-> **What landed after this plan:** shared ACR platform; Qwik foundation + release path;
-> sticky custom domains. **What has not:** this repository still does **not** deploy
-> `access-control-demo` — that brownfield migration is next.
+> **What landed after this plan:** shared ACR platform; Qwik foundation + release
+> path; sticky custom domains; and the `access-control-demo` foundation and
+> production release path. The access-control cutover was recorded complete on
+> 2026-10-08. Statements and approvals below describe the plan at authoring time.
 
 Status at authoring time: implementation-ready plan pending user approval and preflight gates
 
 Primary repository: `iac`
 
-Originally targeted first workload: `access-control-demo` (still the next migration; Qwik shipped first as a greenfield proof)
+Originally targeted first workload: `access-control-demo` (Qwik shipped first as a greenfield proof; access-control migrated afterward)
 
 Review date: 18 September 2026
 

@@ -19,7 +19,7 @@ const caller = {
   callerRepositoryOwnerId: '103235805',
 };
 
-test('accepts the approved production workload', async () => {
+test('should accept the approved production workload', async () => {
   const result = await validateContract(
     await readFixture('workload.valid.json'),
     catalog,
@@ -42,7 +42,7 @@ const invalidFixtures = [
 ];
 
 for (const [fixture, messagePattern] of invalidFixtures) {
-  test(`rejects ${fixture}`, async () => {
+  test(`should reject ${fixture}`, async () => {
     const result = await validateContract(
       await readFixture(fixture),
       catalog,
@@ -54,7 +54,7 @@ for (const [fixture, messagePattern] of invalidFixtures) {
   });
 }
 
-test('rejects a caller repository mismatch', async () => {
+test('should reject a caller repository mismatch', async () => {
   const result = await validateContract(
     await readFixture('workload.valid.json'),
     catalog,
@@ -65,7 +65,7 @@ test('rejects a caller repository mismatch', async () => {
   assert.match(result.errors.join('\n'), /Caller repository must equal/);
 });
 
-test('rejects immutable caller ID mismatches', async () => {
+test('should reject immutable caller ID mismatches', async () => {
   const result = await validateContract(
     await readFixture('workload.valid.json'),
     catalog,
@@ -88,7 +88,7 @@ const missingCallerCases = [
 ];
 
 for (const [field, callerEvidence, messagePattern] of missingCallerCases) {
-  test(`rejects missing caller ${field}`, async () => {
+  test(`should reject missing caller ${field}`, async () => {
     const result = await validateContract(
       await readFixture('workload.valid.json'),
       catalog,
@@ -100,7 +100,7 @@ for (const [field, callerEvidence, messagePattern] of missingCallerCases) {
   });
 }
 
-test('reports every missing caller identity field', async () => {
+test('should report every missing caller identity field', async () => {
   const result = await validateContract(
     await readFixture('workload.valid.json'),
     catalog,
@@ -112,7 +112,7 @@ test('reports every missing caller identity field', async () => {
   assert.match(result.errors.join('\n'), /Caller repository owner ID is required/);
 });
 
-test('parses the exact caller identity option set', () => {
+test('should parse the exact caller identity option set', () => {
   assert.deepEqual(
     parseOptions([
       '--caller-repository',
@@ -142,7 +142,7 @@ const invalidOptionCases = [
 ];
 
 for (const [name, args, messagePattern] of invalidOptionCases) {
-  test(`rejects ${name}`, () => {
+  test(`should reject ${name}`, () => {
     assert.throws(() => parseOptions(args), messagePattern);
   });
 }
@@ -155,7 +155,7 @@ const qwikCaller = {
 
 const qwikCatalog = await readFixture('environment.with-qwik.json');
 
-test('accepts the approved qwik single-container production workload', async () => {
+test('should accept the approved qwik single-container production workload', async () => {
   const result = await validateContract(
     await readFixture('workload.qwik-valid.json'),
     qwikCatalog,
@@ -165,7 +165,7 @@ test('accepts the approved qwik single-container production workload', async () 
   assert.equal(result.valid, true, result.errors.join('\n'));
 });
 
-test('still accepts the access-control-demo contract after qwik is added', async () => {
+test('should still accept the access-control-demo contract after qwik is added', async () => {
   const result = await validateContract(
     await readFixture('workload.valid.json'),
     qwikCatalog,
@@ -175,7 +175,7 @@ test('still accepts the access-control-demo contract after qwik is added', async
   assert.equal(result.valid, true, result.errors.join('\n'));
 });
 
-test('rejects qwik invalid port', async () => {
+test('should reject qwik invalid port', async () => {
   const result = await validateContract(
     await readFixture('workload.qwik-invalid-port.json'),
     qwikCatalog,
@@ -186,7 +186,7 @@ test('rejects qwik invalid port', async () => {
   assert.match(result.errors.join('\n'), /Target port 4000 is not approved/);
 });
 
-test('rejects qwik injected environment variables', async () => {
+test('should reject qwik injected environment variables', async () => {
   const result = await validateContract(
     await readFixture('workload.qwik-injected-env.json'),
     qwikCatalog,
@@ -197,7 +197,7 @@ test('rejects qwik injected environment variables', async () => {
   assert.match(result.errors.join('\n'), /Environment variables must exactly match/);
 });
 
-test('rejects qwik secret refs outside the catalog allowlist', async () => {
+test('should reject qwik secret refs outside the catalog allowlist', async () => {
   const contract = await readFixture('workload.qwik-valid.json');
   contract.secretRefs = { ACA_GENERAL_ACCESS_CODE: 'some-other-secret' };
 
@@ -207,7 +207,7 @@ test('rejects qwik secret refs outside the catalog allowlist', async () => {
   assert.match(result.errors.join('\n'), /Secret references must exactly match/);
 });
 
-test('rejects unapproved qwik secret environment variable names', async () => {
+test('should reject unapproved qwik secret environment variable names', async () => {
   const contract = await readFixture('workload.qwik-valid.json');
   contract.secretRefs = { ORIGIN: 'qwik-demo-general-access-code' };
 
@@ -217,7 +217,7 @@ test('rejects unapproved qwik secret environment variable names', async () => {
   assert.match(result.errors.join('\n'), /Secret environment variable ORIGIN is not approved for this application/);
 });
 
-test('rejects qwik contract missing a required environment variable', async () => {
+test('should reject qwik contract missing a required environment variable', async () => {
   const contract = await readFixture('workload.qwik-valid.json');
   delete contract.env.HOST;
 

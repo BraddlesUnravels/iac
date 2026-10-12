@@ -13,7 +13,7 @@ const evidence = {
   imageDigest: `sha256:${'b'.repeat(64)}`,
 };
 
-test('renders Key Vault secret references for qwik secret env vars', async () => {
+test('should render Key Vault secret references for qwik secret env vars', async () => {
   const parameters = renderWorkloadParameters({
     contract: await readFixture('workload.qwik-valid.json'),
     catalog: await readFixture('environment.with-qwik.json'),
@@ -38,7 +38,7 @@ test('renders Key Vault secret references for qwik secret env vars', async () =>
   );
 });
 
-test('renders empty secret parameters when a workload has no secret refs', async () => {
+test('should render empty secret parameters when a workload has no secret refs', async () => {
   const contract = await readFixture('workload.qwik-valid.json');
   contract.secretRefs = {};
 

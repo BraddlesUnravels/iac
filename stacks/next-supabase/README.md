@@ -5,15 +5,13 @@
 Single Azure Container App shape for a Next.js frontend/BFF that uses hosted
 Supabase. Kept for experimentation and Bicep compile coverage.
 
-Production work uses:
+Production work uses `stacks/single-container-web` for both `qwik-website` and
+`access-control-demo`. This prototype is not the production stack or a migration
+target.
 
-- `stacks/single-container-web` for greenfield single-app releases (Qwik today)
-- a future dedicated brownfield stack for `access-control-demo` (next migration;
-  **not deployed from this repository yet**)
-
-Do not treat this prototype as the access-control migration target. In
-particular, production access-control uses `NEXT_SUPABASE_*` names and Key Vault
-references; this prototype still demonstrates an older parameter style.
+Do not treat this prototype as the access-control production implementation.
+Production access-control uses `NEXT_SUPABASE_*` environment names backed by Key
+Vault references; this prototype still demonstrates an older parameter style.
 
 ## Intended shape
 
@@ -45,5 +43,5 @@ release path.
 
 - Supabase is external; this stack does not create Postgres.
 - Prefer commit-SHA image tags even in lab deploys.
-- Production migration must replace raw secret parameters with Key Vault refs and
-  catalog-driven non-secret settings.
+- Do not introduce this prototype's raw secret parameter pattern into production.
+  Production deployments use the catalogued contract and Key Vault references.

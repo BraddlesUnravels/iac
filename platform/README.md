@@ -19,9 +19,10 @@ Production coordinates come only from `environments/production.json`.
 `main.example.bicepparam` is documentation and compilation support; deployment
 scripts never consume it for production.
 
-`access-control-demo` is **not** deployed by this platform entry point. Platform
-owns shared ACR only. Application migration for access-control is next and
-remains outside this template.
+`access-control-demo` is not deployed by this platform entry point: it is a
+workload using the shared platform ACR. Its foundation and releases use
+`foundations/single-container-web/` and `stacks/single-container-web/`, like
+`qwik-website`.
 
 ## Validate
 

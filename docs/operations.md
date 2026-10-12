@@ -4,16 +4,17 @@ Scope: the subscription-scoped **platform** only — one resource group and one
 shared Azure Container Registry. Platform deployment creates no workload
 identities, role assignments, Container Apps, or image access by itself.
 
-Workload operations (Qwik release path) are documented in
-[workloads/qwik-website-runbook.md](workloads/qwik-website-runbook.md).
+Workload operations for both production consumers are documented in
+[workloads/single-container-web-runbook.md](workloads/single-container-web-runbook.md),
+with application-specific details in the
+[Qwik](workloads/qwik-website-runbook.md) and
+[access-control-demo](workloads/access-control-demo-runbook.md) runbooks.
+The latest recorded cutover state places both workloads and the shared Key Vault
+in `rg-platform-production`; verify live Azure state before making operational
+changes. Do not use platform (ACR-only) scripts to change workload Container Apps.
 
-`access-control-demo` is catalogued and uses the generic single-container release
-workflow. Live compute may still be in `rg-access-control-demo` until foundation
-apply + DNS cutover finish. Shared Key Vault already lives in
-`rg-platform-production`. Do not use platform (ACR-only) scripts to change
-workload Container Apps.
-
-Last documentation pass: 2026-10-08.
+Last documentation review: 2026-10-12. The live platform verification below is
+the latest recorded operational result, not a fresh check from this review.
 
 ## Current live platform state
 

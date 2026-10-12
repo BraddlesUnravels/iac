@@ -63,7 +63,7 @@ const createGithubClient = (overrides = {}) => {
   };
 };
 
-test('accepts a verified stable release payload', async () => {
+test('should accept a verified stable release payload', async () => {
   const result = await verifyRelease({
     payload: validPayload,
     catalog,
@@ -75,7 +75,7 @@ test('accepts a verified stable release payload', async () => {
   assert.equal(result.evidence.releaseId, '42');
 });
 
-test('rejects forged repository id even when slug matches', async () => {
+test('should reject forged repository id even when slug matches', async () => {
   const result = await verifyRelease({
     payload: { ...validPayload, sourceRepositoryId: '1' },
     catalog,
@@ -86,7 +86,7 @@ test('rejects forged repository id even when slug matches', async () => {
   assert.match(result.errors.join('\n'), /sourceRepositoryId must equal/);
 });
 
-test('rejects draft releases from GitHub evidence', async () => {
+test('should reject draft releases from GitHub evidence', async () => {
   const result = await verifyRelease({
     payload: validPayload,
     catalog,
@@ -97,7 +97,7 @@ test('rejects draft releases from GitHub evidence', async () => {
   assert.match(result.errors.join('\n'), /draft/i);
 });
 
-test('rejects tag commit mismatch', async () => {
+test('should reject tag commit mismatch', async () => {
   const result = await verifyRelease({
     payload: validPayload,
     catalog,
@@ -115,7 +115,7 @@ test('rejects tag commit mismatch', async () => {
   assert.match(result.errors.join('\n'), /tag commit does not match/);
 });
 
-test('rejects extra payload properties', async () => {
+test('should reject extra payload properties', async () => {
   const result = await verifyRelease({
     payload: { ...validPayload, subscriptionId: 'evil' },
     catalog,
@@ -126,7 +126,7 @@ test('rejects extra payload properties', async () => {
   assert.match(result.errors.join('\n'), /Unexpected payload field/);
 });
 
-test('accepts payload without optional sourceRunId', async () => {
+test('should accept payload without optional sourceRunId', async () => {
   const { sourceRunId: _ignored, ...payloadWithoutRunId } = validPayload;
   const result = await verifyRelease({
     payload: payloadWithoutRunId,
@@ -138,7 +138,7 @@ test('accepts payload without optional sourceRunId', async () => {
   assert.equal(result.evidence.sourceRunId, undefined);
 });
 
-test('treats GitHub API failures as deployment blockers', async () => {
+test('should treat GitHub API failures as deployment blockers', async () => {
   const result = await verifyRelease({
     payload: validPayload,
     catalog,
@@ -152,7 +152,7 @@ test('treats GitHub API failures as deployment blockers', async () => {
 });
 
 
-test('accepts a verified main-channel payload', async () => {
+test('should accept a verified main-channel payload', async () => {
   const payload = {
     ...validPayload,
     releaseId: '99',
@@ -182,7 +182,7 @@ test('accepts a verified main-channel payload', async () => {
   assert.equal(result.evidence.releasePublishedAt, null);
 });
 
-test('rejects main-channel payload when HEAD does not match source commit', async () => {
+test('should reject main-channel payload when HEAD does not match source commit', async () => {
   const payload = {
     ...validPayload,
     releaseId: '99',

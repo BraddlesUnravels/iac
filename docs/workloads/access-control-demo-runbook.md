@@ -1,6 +1,8 @@
 # access-control-demo platform cutover runbook
 
-Last documentation pass: 2026-10-08.
+Last documentation review: 2026-10-12. The live cutover state is based on the
+latest recorded verification from 2026-10-08; verify Azure and GitHub state
+before making operational changes.
 
 Generic release mechanics:
 [single-container-web-runbook.md](single-container-web-runbook.md).
@@ -41,8 +43,8 @@ az keyvault secret set --vault-name kv-acd-prod-braddles \
 rm ./supabase-url.txt ./supabase-publishable.txt
 ```
 
-Grant the **new** runtime identity secret-scoped `Key Vault Secrets User` on each
-of the four secrets after foundation apply.
+Grant the workload runtime identity secret-scoped `Key Vault Secrets User` on
+each of the four secrets after a foundation apply or identity recreation.
 
 ## Source repo release shape
 

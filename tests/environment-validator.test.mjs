@@ -9,7 +9,7 @@ const readFixture = async (name) =>
     await readFile(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'),
   );
 
-test('accepts the valid environment fixture', async () => {
+test('should accept the valid environment fixture', async () => {
   const result = await validateEnvironment(
     await readFixture('environment.valid.json'),
   );
@@ -17,7 +17,7 @@ test('accepts the valid environment fixture', async () => {
   assert.equal(result.valid, true, result.errors.join('\n'));
 });
 
-test('rejects a login server that does not match the ACR name', async () => {
+test('should reject a login server that does not match the ACR name', async () => {
   const result = await validateEnvironment(
     await readFixture('environment.invalid-login-server.json'),
   );
@@ -26,7 +26,7 @@ test('rejects a login server that does not match the ACR name', async () => {
   assert.match(result.errors.join('\n'), /containerRegistryLoginServer/);
 });
 
-test('rejects inverted environment bounds', async () => {
+test('should reject inverted environment bounds', async () => {
   const result = await validateEnvironment(
     await readFixture('environment.invalid-range.json'),
   );
@@ -35,7 +35,7 @@ test('rejects inverted environment bounds', async () => {
   assert.match(result.errors.join('\n'), /minimum must not exceed/);
 });
 
-test('accepts a workload without secrets or a custom domain', async () => {
+test('should accept a workload without secrets or a custom domain', async () => {
   const result = await validateEnvironment(
     await readFixture('environment.no-capabilities.json'),
   );
@@ -50,7 +50,7 @@ const invalidCapabilityFixtures = [
 ];
 
 for (const [fixture, messagePattern] of invalidCapabilityFixtures) {
-  test(`rejects ${fixture}`, async () => {
+  test(`should reject ${fixture}`, async () => {
     const result = await validateEnvironment(await readFixture(fixture));
 
     assert.equal(result.valid, false);
@@ -58,7 +58,7 @@ for (const [fixture, messagePattern] of invalidCapabilityFixtures) {
   });
 }
 
-test('accepts the production catalog that includes qwik-website', async () => {
+test('should accept the production catalog that includes qwik-website', async () => {
   const result = await validateEnvironment(
     await readFixture('environment.with-qwik.json'),
   );
@@ -66,7 +66,7 @@ test('accepts the production catalog that includes qwik-website', async () => {
   assert.equal(result.valid, true, result.errors.join('\n'));
 });
 
-test('accepts workloads hosted in the shared platform resource group', async () => {
+test('should accept workloads hosted in the shared platform resource group', async () => {
   const result = await validateEnvironment(
     await readFixture('environment.platform-rg-collision.json'),
   );
@@ -74,7 +74,7 @@ test('accepts workloads hosted in the shared platform resource group', async () 
   assert.equal(result.valid, true, result.errors.join('\n'));
 });
 
-test('rejects non-platform resource groups shared by multiple workloads', async () => {
+test('should reject non-platform resource groups shared by multiple workloads', async () => {
   const result = await validateEnvironment(
     await readFixture('environment.duplicate-nonplatform-rg.json'),
   );
@@ -83,7 +83,7 @@ test('rejects non-platform resource groups shared by multiple workloads', async 
   assert.match(result.errors.join('\n'), /Duplicate resource group/);
 });
 
-test('rejects duplicate container app targets across workloads', async () => {
+test('should reject duplicate container app targets across workloads', async () => {
   const result = await validateEnvironment(
     await readFixture('environment.duplicate-app-name.json'),
   );

@@ -30,7 +30,7 @@ const verify = (overrides = {}) =>
     ...overrides,
   });
 
-test('accepts a matching immutable image and returns its digest reference', async () => {
+test('should accept a matching immutable image and return its digest reference', async () => {
   const result = await verify();
 
   assert.equal(result.valid, true, result.errors.join('\n'));
@@ -51,7 +51,7 @@ const invalidCases = [
 ];
 
 for (const [name, overrides, messagePattern] of invalidCases) {
-  test(`rejects ${name}`, async () => {
+  test(`should reject ${name}`, async () => {
     const result = await verify(overrides);
 
     assert.equal(result.valid, false);
@@ -59,14 +59,14 @@ for (const [name, overrides, messagePattern] of invalidCases) {
   });
 }
 
-test('rejects an invalid environment catalog', async () => {
+test('should reject an invalid environment catalog', async () => {
   const result = await verify({ catalogPath: invalidCatalogPath });
 
   assert.equal(result.valid, false);
   assert.match(result.errors.join('\n'), /Environment validation failed/);
 });
 
-test('accepts sourceCommitSha alias without confusing it with an IaC checkout SHA', async () => {
+test('should accept sourceCommitSha alias without confusing it with an IaC checkout SHA', async () => {
   const result = await verify({
     callerSha: undefined,
     sourceCommitSha: imageCases.callerSha,
@@ -75,7 +75,7 @@ test('accepts sourceCommitSha alias without confusing it with an IaC checkout SH
   assert.equal(result.valid, true, result.errors.join('\n'));
 });
 
-test('rejects when only an unrelated IaC sha is supplied as sourceCommitSha', async () => {
+test('should reject when only an unrelated IaC sha is supplied as sourceCommitSha', async () => {
   const result = await verify({
     callerSha: undefined,
     sourceCommitSha: imageCases.differentSha,
