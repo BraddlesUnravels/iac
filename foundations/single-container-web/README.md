@@ -3,13 +3,12 @@
 Subscription-scoped foundation for a single external Container App workload that
 pulls from the shared platform ACR.
 
-Used today by **qwik-website** inside **`rg-platform-production`**.
+Used by **`qwik-website`** and **`access-control-demo`**, each with its own
+resources inside **`rg-platform-production`**.
 
 This foundation does **not** deploy the Container App image/revision. Routine
-releases use `stacks/single-container-web` via `deploy-qwik-release.yml`.
-
-`access-control-demo` is **not** deployed from this foundation. That brownfield
-workload needs its own adopt-in-place foundation (next migration).
+releases use `stacks/single-container-web` via
+`.github/workflows/deploy-single-container-release.yml`.
 
 ## Creates
 
@@ -26,9 +25,9 @@ workload needs its own adopt-in-place foundation (next migration).
 | ACR ABAC repository roles | Publisher Writer + pull/planner/deployer Reader on one repository only |
 
 Does **not** create: the platform resource group, shared ACR (see `platform/`),
-shared Key Vault, Container App revision, custom domain certificates
-(operator/certificate resources are catalogued and bound by the release stack),
-or `access-control-demo` resources.
+shared Key Vault, Container App resources or revisions, managed certificates,
+or DNS records. Certificate resources are provisioned by an operator, then
+catalogued and bound by the release stack.
 
 ## Entry points
 

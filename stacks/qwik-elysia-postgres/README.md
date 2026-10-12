@@ -8,8 +8,8 @@ roughly matching `fullstack-architecture-demo` experiments.
 This is **not** the production Qwik path. Production Qwik uses
 `stacks/single-container-web` with no Azure database.
 
-`access-control-demo` is also **not** deployed by this stack and is not migrated
-into this repository yet.
+`access-control-demo` is not deployed by this prototype. Its production path is
+the shared `single-container-web` stack.
 
 ## Intended shape
 

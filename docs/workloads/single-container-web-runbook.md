@@ -1,6 +1,8 @@
 # Single-container-web release runbook
 
-Last documentation pass: 2026-10-08.
+Last documentation review: 2026-10-12. The live cutover state is based on the
+latest recorded verification from 2026-10-08; verify Azure and GitHub state
+before making operational changes.
 
 ## Purpose
 

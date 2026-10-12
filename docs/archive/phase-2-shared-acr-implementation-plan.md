@@ -7,8 +7,9 @@
 > **Authoritative status:** root [README](../../README.md),
 > [operations.md](../operations.md), and [reusable-iac-design.md](../reusable-iac-design.md).
 >
-> Later work beyond this plan includes the Qwik foundation/release path. This
-> repository still does **not** deploy `access-control-demo` (next migration).
+> Later work beyond this plan includes the Qwik foundation/release path and the
+> `access-control-demo` foundation/release path. The access-control cutover was
+> recorded complete on 2026-10-08; proposed follow-up steps below are historical.
 
 Status at authoring time: implementation handoff  
 Original target branch: `feat/iac-phase-2-shared-acr` (merged; live on `main`)  
