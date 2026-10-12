@@ -6,8 +6,8 @@
 
 This document records the completed migration; it is not a pending handoff or
 runbook. Its original “next stages” and “suggested first prompt” are obsolete and
-have been removed. Use the current [repository README](../README.md), [design
-overview](reusable-iac-design.md), and workload runbooks for present-day guidance.
+have been removed. Use the current [repository README](../../README.md), [design
+overview](../reusable-iac-design.md), and workload runbooks for present-day guidance.
 
 ## Recorded outcome
 
@@ -35,6 +35,6 @@ overview](reusable-iac-design.md), and workload runbooks for present-day guidanc
 - Keep DNS changes manual and review exact record changes before applying.
 
 For the detailed workload configuration and release procedures, see
-[qwik-website-runbook.md](workloads/qwik-website-runbook.md),
-[access-control-demo-runbook.md](workloads/access-control-demo-runbook.md), and
-[single-container-web-runbook.md](workloads/single-container-web-runbook.md).
+[qwik-website-runbook.md](../workloads/qwik-website-runbook.md),
+[access-control-demo-runbook.md](../workloads/access-control-demo-runbook.md), and
+[single-container-web-runbook.md](../workloads/single-container-web-runbook.md).

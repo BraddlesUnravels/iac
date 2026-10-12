@@ -18,34 +18,34 @@ const validateFixture = (name, options = {}) =>
     ...options,
   });
 
-test('accepts initial create of the exact qwik container app', async () => {
+test('should accept initial create of the exact qwik container app', async () => {
   const result = await validateFixture('what-if.qwik-create.json');
   assert.equal(result.valid, true, result.errors.join('\n'));
 });
 
-test('accepts image-only modify with granular delta', async () => {
+test('should accept image-only modify with granular delta', async () => {
   const result = await validateFixture('what-if.qwik-image-modify.json');
   assert.equal(result.valid, true, result.errors.join('\n'));
 });
 
-test('accepts idempotent no-change', async () => {
+test('should accept idempotent no-change', async () => {
   const result = await validateFixture('what-if.qwik-nochange.json');
   assert.equal(result.valid, true, result.errors.join('\n'));
 });
 
-test('rejects identity modification', async () => {
+test('should reject identity modification', async () => {
   const result = await validateFixture('what-if.qwik-identity-modify.json');
   assert.equal(result.valid, false);
   assert.match(result.errors.join('\n'), /Forbidden configuration change|identity/i);
 });
 
-test('rejects unrelated registry changes', async () => {
+test('should reject unrelated registry changes', async () => {
   const result = await validateFixture('what-if.qwik-unrelated.json');
   assert.equal(result.valid, false);
   assert.match(result.errors.join('\n'), /shared platform resource|unapproved resource/);
 });
 
-test('rejects Key Vault mutations even inside the shared platform RG', async () => {
+test('should reject Key Vault mutations even inside the shared platform RG', async () => {
   const catalog = JSON.parse(await readFile(catalogPath, 'utf8'));
   const result = validateWorkloadWhatIf({
     catalog,
@@ -62,12 +62,12 @@ test('rejects Key Vault mutations even inside the shared platform RG', async () 
   assert.match(result.errors.join('\n'), /shared platform resource/);
 });
 
-test('accepts Key Vault secret reference changes for workloads with approved secrets', async () => {
+test('should accept Key Vault secret reference changes for workloads with approved secrets', async () => {
   const result = await validateFixture('what-if.qwik-secrets-modify.json');
   assert.equal(result.valid, true, result.errors.join('\n'));
 });
 
-test('rejects secret changes for workloads without approved secrets', async () => {
+test('should reject secret changes for workloads without approved secrets', async () => {
   const catalog = JSON.parse(await readFile(catalogPath, 'utf8'));
   catalog.workloads['qwik-website'].allowedSecretNames = [];
   const whatIfResult = JSON.parse(
@@ -84,7 +84,7 @@ test('rejects secret changes for workloads without approved secrets', async () =
   assert.match(result.errors.join('\n'), /properties\.configuration\.secrets/);
 });
 
-test('accepts live CLI Ignore entries for untouched workload foundation resources', async () => {
+test('should accept live CLI Ignore entries for untouched workload foundation resources', async () => {
   const catalog = JSON.parse(await readFile(catalogPath, 'utf8'));
   const prefix = `/subscriptions/${catalog.azure.subscriptionId}/resourceGroups/${catalog.workloads['qwik-website'].resourceGroup}/providers/`;
   const foundationIds = [
@@ -114,7 +114,7 @@ test('accepts live CLI Ignore entries for untouched workload foundation resource
   }
 });
 
-test('Ignore never permits a skipped app or a different workload scope', async () => {
+test('should never permit a skipped app or a different workload scope via Ignore', async () => {
   const catalog = JSON.parse(await readFile(catalogPath, 'utf8'));
   const workload = catalog.workloads['qwik-website'];
   for (const [group, type] of [
@@ -138,7 +138,7 @@ test('Ignore never permits a skipped app or a different workload scope', async (
 });
 
 
-test('accepts Ignore and NoChange noise for shared ACR and Key Vault', async () => {
+test('should accept Ignore and NoChange noise for shared ACR and Key Vault', async () => {
   const catalog = JSON.parse(await readFile(catalogPath, 'utf8'));
   const rg = catalog.workloads['qwik-website'].resourceGroup;
   const sub = catalog.azure.subscriptionId;
@@ -174,7 +174,7 @@ test('accepts Ignore and NoChange noise for shared ACR and Key Vault', async () 
   }
 });
 
-test('nested deployments must use the exact workload resource group boundary', async () => {
+test('should require nested deployments to use the exact workload resource group boundary', async () => {
   const catalog = JSON.parse(await readFile(catalogPath, 'utf8'));
   const workload = catalog.workloads['qwik-website'];
   const resourceId = `/subscriptions/${catalog.azure.subscriptionId}/resourceGroups/${workload.resourceGroup}-other/providers/Microsoft.Resources/deployments/nested`;

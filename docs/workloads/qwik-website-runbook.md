@@ -116,4 +116,4 @@ Never retag a release or deploy `latest`.
 - [Access-control runbook](access-control-demo-runbook.md)
 - [Workload foundation](../../foundations/single-container-web/README.md)
 - [Production stack](../../stacks/single-container-web/README.md)
-- [Consolidation completion record](../handoff-platform-rg-consolidation.md)
+- [Consolidation completion record](../archive/handoff-platform-rg-consolidation.md)

@@ -85,7 +85,7 @@ fi
   };
 };
 
-test('ACR resolver emits only JSON on stdout and validation status on stderr', async (t) => {
+test('should emit only JSON on stdout and validation status on stderr from the ACR resolver', async (t) => {
   const { env } = await setup(t);
   const result = spawnSync('bash', [
     join(root, 'scripts/resolve-acr-image.sh'), catalogPath, 'qwik-website', sourceSha,
@@ -100,7 +100,7 @@ test('ACR resolver emits only JSON on stdout and validation status on stderr', a
 });
 
 for (const mismatch of [false, true]) {
-  test(`planner preflight ${mismatch ? 'rejects a mismatched' : 'accepts a matching'} live digest`, async (t) => {
+  test(`should ${mismatch ? 'reject a mismatched' : 'accept a matching'} live digest during planner preflight`, async (t) => {
     const { env, evidencePath } = await setup(t);
     if (mismatch) env.MOCK_DIGEST = `sha256:${'c'.repeat(64)}`;
     const result = spawnSync('bash', [
@@ -122,7 +122,7 @@ for (const mismatch of [false, true]) {
 }
 
 for (const operation of ['what-if', 'apply']) {
-  test(`${operation} uses the appropriate RBAC validation level`, async (t) => {
+  test(`should use the appropriate RBAC validation level for ${operation}`, async (t) => {
     const { env, evidencePath } = await setup(t);
     const result = spawnSync('bash', [
       join(root, 'scripts/deploy-workload-release.sh'),
@@ -144,7 +144,7 @@ for (const operation of ['what-if', 'apply']) {
   });
 }
 
-test('read-only planner what-if still rejects unrelated resource changes', async (t) => {
+test('should still reject unrelated resource changes during read-only planner what-if', async (t) => {
   const { env, evidencePath } = await setup(t);
   env.MOCK_WHAT_IF = join(root, 'tests/fixtures/what-if.qwik-unrelated.json');
   const result = spawnSync('bash', [
@@ -160,7 +160,7 @@ test('read-only planner what-if still rejects unrelated resource changes', async
 });
 
 for (const operation of ['preflight', 'what-if', 'apply']) {
-  test(`${operation} stops before what-if/apply when live deployment permissions are missing`, async (t) => {
+  test(`should stop before what-if/apply when live deployment permissions are missing during ${operation}`, async (t) => {
     const { env, evidencePath } = await setup(t);
     env.MOCK_PERMISSIONS = JSON.stringify({ value: [{ actions: ['*/read'], notActions: [] }] });
     const result = spawnSync('bash', [

@@ -11,9 +11,7 @@ as a public portfolio. They are not credentials.
 
 ## Current status
 
-**Documentation reviewed: 2026-10-12.** The latest recorded live-state
-verification in the operational runbooks is dated 2026-10-08; this repository
-review did not query Azure or GitHub to re-verify live resources or settings.
+**Documentation last reviewed: 12-10-2026.**
 
 | Area | Repository status |
 | --- | --- |
@@ -129,5 +127,5 @@ templates with Checkov. Static validation does not sign in to Azure.
 | [platform/README.md](platform/README.md) | Shared platform template |
 | [foundations/single-container-web/README.md](foundations/single-container-web/README.md) | Workload foundation template |
 | [stacks/single-container-web/README.md](stacks/single-container-web/README.md) | Production release stack |
-| [docs/plans/](docs/plans/) | Historical planning records, not current status |
-| [docs/handoff-platform-rg-consolidation.md](docs/handoff-platform-rg-consolidation.md) | Archived completion record for the 2026-10-08 consolidation |
+| [docs/archive/README.md](docs/archive/README.md) | Historical planning records, not current status |
+| [docs/archive/handoff-platform-rg-consolidation.md](docs/archive/handoff-platform-rg-consolidation.md) | Archived completion record for the 2026-10-08 consolidation |

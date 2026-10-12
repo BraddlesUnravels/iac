@@ -5,11 +5,10 @@ platform resource group; `qwik-website` and `access-control-demo` use the shared
 single-container foundation and release stack.
 
 Last reviewed: 2026-10-12. The live topology described here follows the latest
-recorded operator verification (2026-10-08); it was not independently checked
-against Azure as part of this documentation review.
+recorded operator verification (2026-10-08).
 
-Older implementation plans are retained in [plans/](plans/) as historical
-records. They are not current deployment guidance.
+Older implementation plans are retained in the [archive](archive/README.md) as
+historical records. They are not current deployment guidance.
 
 ## Goal and ownership
 
@@ -125,14 +124,11 @@ parameters, or Bicep.
 - `scripts/bootstrap-oidc.sh` is not part of the production path. It grants
   resource-group Contributor and changes the active Azure subscription; do not
   use it to provision production identities or permissions.
-- `modules/key-vault/main.bicep` is not referenced by a production entry point.
-  Its legacy defaults disable purge protection and accept raw secret values as
-  deployment parameters, so it must not be used for production secret management.
 - `modules/role-assignment/main.bicep` has no current template callers. Confirm
   there is no external or manual consumer before removing it.
 
 These files remain in the repository for experimentation, migration history, or
-compile/security coverage. Their presence does not authorize production use.
+compile/security coverage.
 
 ## Validation and operations
 
