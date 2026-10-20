@@ -376,8 +376,8 @@ run_verify() {
       exit 1
     fi
 
-    # Qwik City case-study routes are trailing-slash canonical.
-    study_code="$(curl -sS -o /tmp/scw-live-study -w '%{http_code}' "${url}/work/access-control-demo/")"
+    # Qwik City uses trailingSlash: false; bare paths are canonical (slash forms 301).
+    study_code="$(curl -sS -o /tmp/scw-live-study -w '%{http_code}' "${url}/work/access-control-demo")"
     if [[ "${study_code}" != '200' ]]; then
       echo "Case study expected 200, got ${study_code}" >&2
       exit 1
