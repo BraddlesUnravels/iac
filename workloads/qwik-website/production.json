@@ -8,7 +8,7 @@
     "targetPort": 3000,
     "healthProbePath": "/health",
     "cpu": "0.25",
-    "memory": "0.5Gi",
+    "memory": "1Gi",
     "minReplicas": 1,
     "maxReplicas": 1
   },
