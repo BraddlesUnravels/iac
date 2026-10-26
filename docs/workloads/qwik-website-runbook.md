@@ -109,6 +109,14 @@ There is no automatic rollback. Select only a previously verified image digest,
 rerun it through the guarded release path, and verify the health endpoint.
 Never retag a release or deploy `latest`.
 
+## Live smoke checks
+
+After deploying, the shared release verifier checks the configured `/health`
+probe, the homepage (`/`), and the Access Control Demo project page
+(`/projects/access-control-demo`) against the selected production domain. Qwik
+City uses `trailingSlash: false`, so the verifier requests the bare project
+path; the slash-suffixed form redirects.
+
 ## Related documentation
 
 - [Root README](../../README.md)

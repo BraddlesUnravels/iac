@@ -377,9 +377,9 @@ run_verify() {
     fi
 
     # Qwik City uses trailingSlash: false; bare paths are canonical (slash forms 301).
-    study_code="$(curl -sS -o /tmp/scw-live-study -w '%{http_code}' "${url}/work/access-control-demo")"
-    if [[ "${study_code}" != '200' ]]; then
-      echo "Case study expected 200, got ${study_code}" >&2
+    project_code="$(curl -sS -o /tmp/scw-live-project -w '%{http_code}' "${url}/projects/access-control-demo")"
+    if [[ "${project_code}" != '200' ]]; then
+      echo "Project page expected 200, got ${project_code}" >&2
       exit 1
     fi
   fi
