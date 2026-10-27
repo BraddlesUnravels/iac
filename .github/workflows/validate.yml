@@ -59,6 +59,7 @@ jobs:
           tests/acr-image-resolver.test.mjs
           tests/deployment-permissions.test.mjs
           tests/release-verifier.test.mjs
+          tests/workload-live-verifier.test.mjs
           tests/workload-what-if-validator.test.mjs
           tests/platform-what-if-validator.test.mjs
 

@@ -269,6 +269,51 @@ run_apply() {
   printf 'imageDigest=%s\n' "${image_digest}"
 }
 
+wait_for_http_200() {
+  local endpoint="$1" deadline="$2"
+  local attempt remaining request_timeout retry_delay http_code='not attempted' curl_status=0
+  local error_file="${temporary_directory}/live-http-error"
+
+  for ((attempt = 1; attempt <= 30; attempt++)); do
+    remaining=$((deadline - SECONDS))
+    if ((remaining <= 0)); then
+      break
+    fi
+    request_timeout=10
+    if ((remaining < request_timeout)); then
+      request_timeout="${remaining}"
+    fi
+
+    if http_code="$(curl --silent --show-error --output /dev/null \
+      --write-out '%{http_code}' --connect-timeout 5 --max-time "${request_timeout}" \
+      "${endpoint}" 2>"${error_file}")"; then
+      curl_status=0
+    else
+      curl_status=$?
+    fi
+    if [[ "${curl_status}" -eq 0 && "${http_code}" == '200' ]]; then
+      return 0
+    fi
+
+    echo "HTTP verification attempt ${attempt}/30 for ${endpoint}: HTTP ${http_code:-000}, curl exit ${curl_status}" >&2
+    if [[ -s "${error_file}" ]]; then
+      cat "${error_file}" >&2
+    fi
+    remaining=$((deadline - SECONDS))
+    if ((attempt == 30 || remaining <= 0)); then
+      break
+    fi
+    retry_delay=5
+    if ((remaining < retry_delay)); then
+      retry_delay="${remaining}"
+    fi
+    sleep "${retry_delay}"
+  done
+
+  echo "Live HTTP verification failed for ${endpoint}: expected 200, last HTTP ${http_code:-000}, curl exit ${curl_status} (30 attempts or shared 300-second deadline exhausted)." >&2
+  return 1
+}
+
 run_verify() {
   local app_json fqdn configured_image url custom_domain certificate_id bound_domain bound_cert azure_custom_domain
   app_json="$(az containerapp show \
@@ -351,37 +396,16 @@ run_verify() {
     exit 1
   fi
 
+  local verification_deadline=$((SECONDS + 300))
   health_url="${url}${health_path}"
-  ready=0
-  for _ in $(seq 1 30); do
-    health_code="$(curl -sS -o /tmp/scw-live-health -w '%{http_code}' --max-time 10 "${health_url}" || true)"
-    if [[ "${health_code}" == '200' ]]; then
-      ready=1
-      break
-    fi
-    sleep 5
-  done
-
-  if [[ "${ready}" -ne 1 ]]; then
-    echo "Live health verification failed for ${health_url}" >&2
-    cat /tmp/scw-live-health >&2 || true
-    exit 1
-  fi
+  wait_for_http_200 "${health_url}" "${verification_deadline}"
 
   # Qwik keeps a couple of extra smoke routes; other apps only need health.
   if [[ "${APPLICATION}" == 'qwik-website' ]]; then
-    homepage_code="$(curl -sS -o /tmp/scw-live-home -w '%{http_code}' "${url}/")"
-    if [[ "${homepage_code}" != '200' ]]; then
-      echo "Homepage expected 200, got ${homepage_code}" >&2
-      exit 1
-    fi
+    wait_for_http_200 "${url}/" "${verification_deadline}"
 
     # Qwik City uses trailingSlash: false; bare paths are canonical (slash forms 301).
-    project_code="$(curl -sS -o /tmp/scw-live-project -w '%{http_code}' "${url}/projects/access-control-demo")"
-    if [[ "${project_code}" != '200' ]]; then
-      echo "Project page expected 200, got ${project_code}" >&2
-      exit 1
-    fi
+    wait_for_http_200 "${url}/projects/access-control-demo" "${verification_deadline}"
   fi
 
   printf 'url=%s\n' "${url}"

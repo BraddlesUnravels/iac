@@ -114,3 +114,23 @@ Then:
 - Planner/deployer must not hold standing RG Contributor.
 - Do not delete `rg-platform-production` or the shared vault during workload teardown.
 - DNS (GoDaddy) stays manual; provide exact record diffs only.
+
+## Live HTTP verification
+
+Every application uses the same bounded HTTP readiness check for its configured
+health endpoint. Qwik also checks `/` and `/projects/access-control-demo`.
+Each endpoint must return HTTP 200 without following redirects; a successful
+health check does not skip the remaining smoke checks.
+
+HTTP errors (including temporary 404s), connection failures, and timeouts are
+retried up to 30 times per endpoint with five seconds between attempts. All
+HTTP checks share a 300-second deadline; each request is limited to ten seconds
+with a five-second connection timeout. Persistent failures still fail the job.
+Diagnostics identify the exact URL, HTTP status, and curl exit code without
+logging response bodies, which may contain application data.
+
+A verification failure happens after apply and does not roll back the deployed
+image automatically. Investigate the failing URL and release evidence rather
+than treating a failed workflow as proof that no deployment occurred. Start a
+new source release dispatch after fixing the verifier; rerunning an old workflow
+uses its original IaC commit.
