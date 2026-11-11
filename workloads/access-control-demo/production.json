@@ -9,7 +9,7 @@
     "healthProbePath": "/api/health",
     "cpu": "0.25",
     "memory": "0.5Gi",
-    "minReplicas": 1,
+    "minReplicas": 0,
     "maxReplicas": 1
   },
   "env": {

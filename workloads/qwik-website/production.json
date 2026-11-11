@@ -17,7 +17,8 @@
     "PORT": "3000",
     "HOST": "0.0.0.0",
     "ACA_DEMO_DOMAIN": "https://aca.braddlesunravels.online",
-    "ACA_DEMO_ACCESS_LINK": "{{ACA_DEMO_DOMAIN}}/?code={{ACA_GENERAL_ACCESS_CODE}}"
+    "ACA_DEMO_ACCESS_LINK": "{{ACA_DEMO_DOMAIN}}/?code={{ACA_GENERAL_ACCESS_CODE}}",
+    "PUBLIC_GA_MEASUREMENT_ID": "G-54QNGT7RLF"
   },
   "secretRefs": {
     "ACA_GENERAL_ACCESS_CODE": "qwik-demo-general-access-code"

@@ -15,6 +15,7 @@
 !.env.example
 *.pem
 *.key
+.serena
 
 # Node validation tooling
 node_modules/

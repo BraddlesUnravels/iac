@@ -45,11 +45,11 @@
           3000
         ],
         "minReplicas": {
-          "minimum": 1,
+          "minimum": 0,
           "maximum": 1
         },
         "maxReplicas": {
-          "minimum": 1,
+          "minimum": 0,
           "maximum": 1
         },
         "healthProbePaths": [
