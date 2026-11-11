@@ -11,34 +11,38 @@ const schemaUrl = new URL('../schemas/workload.schema.json', import.meta.url);
 
 // Production policy is application-aware on the shared single-container-web stack.
 const productionApplicationPolicies = {
-  'access-control-demo': {
-    stack: 'single-container-web',
+  "access-control-demo": {
+    stack: "single-container-web",
     environment: {
-      ACCESS_GATE_DISABLED: 'false',
-      HOSTNAME: '0.0.0.0',
-      NEXT_TELEMETRY_DISABLED: '1',
-      NODE_ENV: 'production',
-      PORT: '3000',
+      ACCESS_GATE_DISABLED: "false",
+      HOSTNAME: "0.0.0.0",
+      NEXT_TELEMETRY_DISABLED: "1",
+      NODE_ENV: "production",
+      PORT: "3000",
     },
     requireEmptySecretRefs: false,
     allowedSecretEnvironmentNames: [
-      'ACCESS_GATE_CODE_SECRET',
-      'ACCESS_GATE_COOKIE_SECRET',
-      'NEXT_SUPABASE_PUBLISHABLE_KEY',
-      'NEXT_SUPABASE_URL',
+      "ACCESS_GATE_CODE_SECRET",
+      "ACCESS_GATE_COOKIE_SECRET",
+      "NEXT_SUPABASE_PUBLISHABLE_KEY",
+      "NEXT_SUPABASE_URL",
     ],
     requireCustomDomainDisabled: false,
   },
-  'qwik-website': {
-    stack: 'single-container-web',
+  "qwik-website": {
+    stack: "single-container-web",
     environment: {
-      NODE_ENV: 'production',
-      PORT: '3000',
-      HOST: '0.0.0.0',
+      NODE_ENV: "production",
+      PORT: "3000",
+      HOST: "0.0.0.0",
     },
     requireEmptySecretRefs: false,
-    optionalEnvironmentNames: ['ACA_DEMO_DOMAIN', 'ACA_DEMO_ACCESS_LINK'],
-    allowedSecretEnvironmentNames: ['ACA_GENERAL_ACCESS_CODE'],
+    optionalEnvironmentNames: [
+      "ACA_DEMO_DOMAIN",
+      "ACA_DEMO_ACCESS_LINK",
+      "PUBLIC_GA_MEASUREMENT_ID",
+    ],
+    allowedSecretEnvironmentNames: ["ACA_GENERAL_ACCESS_CODE"],
     requireCustomDomainDisabled: false,
   },
 };
